@@ -22,10 +22,9 @@ const Login = () => {
         }
 
         // In a real app, the backend would verify credentials and return the user's role.
-        // For this prototype, we'll just redirect to the admin panel by default.
-        // You can manually change the URL to /vendor/dashboard or /user/dashboard to test other panels.
+        // For this prototype, we'll just redirect to the main dashboard.
         console.log('Login submitted', { email, password });
-        navigate('/admin/dashboard');
+        navigate('/dashboard');
     };
 
     return (

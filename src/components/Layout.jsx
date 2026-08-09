@@ -1,9 +1,16 @@
 import React from 'react';
-import { LogOut, Bell } from 'lucide-react';
+import {
+    LayoutDashboard,
+    Gem,
+    Users,
+    Settings,
+    LogOut,
+    Bell
+} from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../css/Dashboard.css';
 
-const Layout = ({ children, title, role, links }) => {
+const Layout = ({ children, title }) => {
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -20,16 +27,23 @@ const Layout = ({ children, title, role, links }) => {
                 <div className="sidebar-header">
                     <img src="/logo.png" alt="Hey Diamond" className="sidebar-logo" />
                 </div>
-                <div style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid var(--color-input-border)' }}>
-                    {role} Panel
-                </div>
                 <nav className="sidebar-nav">
-                    {links.map((link, index) => (
-                        <Link key={index} to={link.path} className={`nav-item ${isActive(link.path)}`}>
-                            {link.icon}
-                            <span>{link.label}</span>
-                        </Link>
-                    ))}
+                    <Link to="/dashboard" className={`nav-item ${isActive('/dashboard')}`}>
+                        <LayoutDashboard size={20} />
+                        <span>Dashboard</span>
+                    </Link>
+                    <Link to="/inventory" className={`nav-item ${isActive('/inventory')}`}>
+                        <Gem size={20} />
+                        <span>Inventory</span>
+                    </Link>
+                    <Link to="/users" className={`nav-item ${isActive('/users')}`}>
+                        <Users size={20} />
+                        <span>Users</span>
+                    </Link>
+                    <Link to="/settings" className={`nav-item ${isActive('/settings')}`}>
+                        <Settings size={20} />
+                        <span>Settings</span>
+                    </Link>
                 </nav>
                 <div className="sidebar-nav" style={{ flex: 'none', borderTop: '1px solid var(--color-input-border)' }}>
                     <button onClick={handleLogout} className="nav-item" style={{ background: 'none', border: 'none', width: '100%', cursor: 'pointer' }}>
@@ -49,10 +63,10 @@ const Layout = ({ children, title, role, links }) => {
                             <Bell size={20} />
                         </button>
                         <div className="user-profile">
-                            <div className="avatar">{role.charAt(0)}</div>
+                            <div className="avatar">U</div>
                             <div className="user-info">
-                                <span className="user-name">Test {role}</span>
-                                <span className="user-role">{role}</span>
+                                <span className="user-name">HeyDiamond User</span>
+                                <span className="user-role">Member</span>
                             </div>
                         </div>
                     </div>

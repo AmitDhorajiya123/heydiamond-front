@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
-import AdminPanel from './panels/admin/AdminPanel';
-import VendorPanel from './panels/vendor/VendorPanel';
-import UserPanel from './panels/user/UserPanel';
+import Dashboard from './pages/Dashboard';
+import Users from './pages/Users';
+import Inventory from './pages/Inventory';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -17,10 +18,10 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
-          {/* Role-based Panels */}
-          <Route path="/admin/*" element={<AdminPanel />} />
-          <Route path="/vendor/*" element={<VendorPanel />} />
-          <Route path="/user/*" element={<UserPanel />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
     </Router>
