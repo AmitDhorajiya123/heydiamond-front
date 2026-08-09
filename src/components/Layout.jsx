@@ -89,7 +89,7 @@ const Layout = ({ children }) => {
                         <div className="seller-detail">
                             <strong>Your Seller Detail:</strong>
                             <div className="seller-info">
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={12} /> Anand</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={12} /> Lalji Chovatiya</span>
                                 <span>/</span>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={12} /> 6353388010</span>
                                 <span>/</span>
@@ -113,11 +113,11 @@ const Layout = ({ children }) => {
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--color-input-border)', paddingLeft: '16px' }}>
                             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <User size={20} />
+                                <span>LC</span>
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', fontSize: '12px' }}>
                                 <span style={{ color: 'var(--color-text-light)' }}>Welcome,</span>
-                                <span style={{ color: 'var(--color-primary)', fontWeight: '600' }}>Admin User</span>
+                                <span style={{ color: 'var(--color-primary)', fontWeight: '600' }}>Lalji Chovatiya</span>
                             </div>
                         </div>
                     </div>
