@@ -83,7 +83,7 @@ const Inventory = () => {
                         <span className="filter-label">Size<br />(Carats)</span>
                     </div>
                     <div className="filter-options" style={{ flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '24px' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '24px', flexWrap: 'wrap' }}>
                             <div className="range-inputs">
                                 <div className="range-input-wrapper">
                                     <label>From</label>
@@ -96,7 +96,7 @@ const Inventory = () => {
                             </div>
                             <button className="reset-btn" style={{ marginBottom: '10px' }}><RotateCcw size={12} /> Reset</button>
 
-                            <div style={{ marginLeft: '40px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                                 <span className="filter-label">StoneNo./Certificate No.</span>
                                 <div style={{ position: 'relative' }}>
                                     <input type="text" className="search-large-input" placeholder="Enter Stone/Cert. number" />
@@ -105,7 +105,7 @@ const Inventory = () => {
                                 <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                             <button className="filter-btn active" style={{ borderBottom: '2px solid var(--color-primary)', borderRadius: 0, padding: '4px 8px', background: 'none', color: 'var(--color-text-dark)' }}>0.000 - 0.220</button>
                             <button className="filter-btn" style={{ border: 'none', background: 'none' }}>0.230 - 0.290</button>
                             <button className="filter-btn" style={{ border: 'none', background: 'none' }}>0.300 - 0.390</button>
@@ -182,7 +182,7 @@ const Inventory = () => {
                         <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
                     </div>
                     <div className="filter-options" style={{ alignItems: 'center', gap: '24px' }}>
-                        <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                             {labs.map(l => (
                                 <button key={l} className="filter-btn" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '1px solid #ccc' }}></div> {l}
@@ -190,12 +190,12 @@ const Inventory = () => {
                             ))}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginLeft: '24px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                             <div className="filter-label-group" style={{ width: 'auto' }}>
                                 <span className="filter-label">Growth Type</span>
                                 <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
                             </div>
-                            <div style={{ display: 'flex', gap: '12px' }}>
+                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                 {growthTypes.map(g => (
                                     <button key={g} className="filter-btn">{g}</button>
                                 ))}

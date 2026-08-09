@@ -9,7 +9,7 @@ const Settings = () => {
                 <h2 className="table-title" style={{ marginBottom: '24px' }}>General Settings</h2>
 
                 <form className="login-form" onSubmit={(e) => e.preventDefault()}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                    <div className="settings-grid">
                         <div className="input-group">
                             <label htmlFor="siteName">Site Name</label>
                             <div className="input-wrapper">

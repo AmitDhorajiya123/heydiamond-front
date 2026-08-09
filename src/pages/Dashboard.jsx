@@ -31,8 +31,8 @@ const Dashboard = () => {
                 ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '20px' }}>
-                <div className="summary-card" style={{ flex: 1, maxWidth: '300px' }}>
+            <div className="dashboard-grid" style={{ marginTop: '20px' }}>
+                <div className="summary-card">
                     <div className="summary-info">
                         <span className="summary-label" style={{ color: 'var(--color-text-dark)', fontSize: '14px', borderBottom: '2px solid var(--color-text-dark)', paddingBottom: '4px', marginBottom: '12px', display: 'inline-block' }}>My Cart</span>
                         <span className="summary-count">0</span>
@@ -40,7 +40,7 @@ const Dashboard = () => {
                     <ShoppingCart className="summary-icon" style={{ opacity: 0.2 }} />
                 </div>
 
-                <div className="summary-card" style={{ flex: 1, maxWidth: '300px' }}>
+                <div className="summary-card">
                     <div className="summary-info">
                         <span className="summary-label" style={{ color: 'var(--color-text-dark)', fontSize: '14px', borderBottom: '2px solid var(--color-text-dark)', paddingBottom: '4px', marginBottom: '12px', display: 'inline-block' }}>New Arrivals</span>
                         <span className="summary-count">3362</span>
