@@ -46,7 +46,7 @@ input:-webkit-autofill:active {
 }
 
 .logo-container {
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     display: flex;
     justify-content: center;
     width: 100%;
@@ -54,7 +54,7 @@ input:-webkit-autofill:active {
 
 .logo {
     width: 100%;
-    max-width: 240px;
+    max-width: 200px;
     height: auto;
     object-fit: contain;
 }
@@ -71,7 +71,7 @@ input:-webkit-autofill:active {
 .subtitle {
     font-size: 14px;
     color: var(--color-text-light);
-    margin-bottom: 32px;
+    margin-bottom: 24px;
     text-align: center;
 }
 
