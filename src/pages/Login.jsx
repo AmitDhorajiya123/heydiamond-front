@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Mail, Lock, EyeOff, Eye } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../css/Auth.css';
 
 const Login = () => {
+    const navigate = useNavigate();
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -22,6 +23,7 @@ const Login = () => {
 
         // Proceed with login logic here
         console.log('Login submitted', { email, password });
+        navigate('/dashboard');
     };
 
     return (
