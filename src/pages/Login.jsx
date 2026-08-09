@@ -8,7 +8,6 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState('admin');
     const [errors, setErrors] = useState({});
 
     const handleSubmit = (e) => {
@@ -22,10 +21,11 @@ const Login = () => {
             return;
         }
 
-        // Redirect based on selected role
-        if (role === 'admin') navigate('/admin/dashboard');
-        else if (role === 'vendor') navigate('/vendor/dashboard');
-        else if (role === 'user') navigate('/user/dashboard');
+        // In a real app, the backend would verify credentials and return the user's role.
+        // For this prototype, we'll just redirect to the admin panel by default.
+        // You can manually change the URL to /vendor/dashboard or /user/dashboard to test other panels.
+        console.log('Login submitted', { email, password });
+        navigate('/admin/dashboard');
     };
 
     return (
@@ -40,21 +40,6 @@ const Login = () => {
                 <p className="subtitle">Access your premium diamond trading account</p>
 
                 <form className="login-form" onSubmit={handleSubmit}>
-                    <div className="input-group">
-                        <label>Login As (For Testing)</label>
-                        <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                                <input type="radio" name="role" value="admin" checked={role === 'admin'} onChange={() => setRole('admin')} /> Admin
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                                <input type="radio" name="role" value="vendor" checked={role === 'vendor'} onChange={() => setRole('vendor')} /> Vendor
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                                <input type="radio" name="role" value="user" checked={role === 'user'} onChange={() => setRole('user')} /> User
-                            </label>
-                        </div>
-                    </div>
-
                     <div className="input-group">
                         <label htmlFor="email">Email or Username</label>
                         <div className="input-wrapper">
