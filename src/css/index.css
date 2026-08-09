@@ -3,13 +3,13 @@
 :root {
   --font-serif: 'Playfair Display', serif;
   --font-sans: 'Inter', sans-serif;
-  --color-primary: #130f0b;
-  --color-primary-hover: #8c6844;
-  --color-text-dark: #2c2c2c;
-  --color-text-light: #7a7a7a;
-  --color-bg-card: rgba(252, 248, 245, 0.95);
-  --color-input-bg: rgba(245, 240, 235, 0.8);
-  --color-input-border: #e8e0d5;
+  --color-primary: #977554;
+  --color-primary-hover: #7a5e43;
+  --color-text-dark: #0d090a;
+  --color-text-light: #6b5c51;
+  --color-bg-card: rgba(255, 253, 250, 0.95);
+  --color-input-bg: rgba(250, 246, 240, 0.8);
+  --color-input-border: #e6dcd3;
 }
 
 * {

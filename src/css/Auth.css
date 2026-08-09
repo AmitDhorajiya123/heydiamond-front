@@ -65,7 +65,7 @@ input:-webkit-autofill:active {
     font-family: var(--font-serif);
     font-size: 32px;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--color-text-dark);
     margin-bottom: 8px;
     text-align: center;
 }
@@ -93,7 +93,7 @@ input:-webkit-autofill:active {
 .input-group label {
     font-size: 13px;
     font-weight: 500;
-    color: #4a4a4a;
+    color: var(--color-text-dark);
 }
 
 .input-wrapper {
