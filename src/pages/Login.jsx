@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, EyeOff, Eye, Shield } from 'lucide-react';
+import { Mail, Lock, EyeOff, Eye } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import '../css/Auth.css';
 
@@ -22,9 +22,10 @@ const Login = () => {
             return;
         }
 
-        // Save role and redirect
-        localStorage.setItem('userRole', role);
-        navigate(`/${role}/dashboard`);
+        // Redirect based on selected role
+        if (role === 'admin') navigate('/admin/dashboard');
+        else if (role === 'vendor') navigate('/vendor/dashboard');
+        else if (role === 'user') navigate('/user/dashboard');
     };
 
     return (
@@ -40,31 +41,17 @@ const Login = () => {
 
                 <form className="login-form" onSubmit={handleSubmit}>
                     <div className="input-group">
-                        <label htmlFor="role">Login As</label>
-                        <div className="input-wrapper">
-                            <Shield className="input-icon" size={18} />
-                            <select
-                                id="role"
-                                value={role}
-                                onChange={(e) => setRole(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '14px 16px 14px 44px',
-                                    border: '1px solid var(--color-input-border)',
-                                    borderRadius: '12px',
-                                    backgroundColor: 'var(--color-input-bg)',
-                                    fontFamily: 'var(--font-sans)',
-                                    fontSize: '14px',
-                                    color: 'var(--color-text-dark)',
-                                    outline: 'none',
-                                    appearance: 'none',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <option value="admin">Admin</option>
-                                <option value="vendor">Vendor</option>
-                                <option value="user">User</option>
-                            </select>
+                        <label>Login As (For Testing)</label>
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input type="radio" name="role" value="admin" checked={role === 'admin'} onChange={() => setRole('admin')} /> Admin
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input type="radio" name="role" value="vendor" checked={role === 'vendor'} onChange={() => setRole('vendor')} /> Vendor
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                                <input type="radio" name="role" value="user" checked={role === 'user'} onChange={() => setRole('user')} /> User
+                            </label>
                         </div>
                     </div>
 

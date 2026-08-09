@@ -1,61 +1,17 @@
 import React from 'react';
-import {
-    LayoutDashboard,
-    Gem,
-    Users,
-    Settings,
-    LogOut,
-    Bell,
-    Search,
-    ShoppingCart,
-    User as UserIcon,
-    Package
-} from 'lucide-react';
+import { LogOut, Bell } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../css/Dashboard.css';
 
-const Layout = ({ children, title }) => {
+const Layout = ({ children, title, role, links }) => {
     const location = useLocation();
     const navigate = useNavigate();
-    const role = localStorage.getItem('userRole') || 'admin';
 
     const handleLogout = () => {
-        // Clear role from localStorage on logout
-        localStorage.removeItem('userRole');
         navigate('/login');
     };
 
     const isActive = (path) => location.pathname === path ? 'active' : '';
-
-    // Define navigation links based on role
-    const getNavLinks = () => {
-        switch (role) {
-            case 'vendor':
-                return [
-                    { path: '/vendor/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-                    { path: '/vendor/inventory', icon: <Package size={20} />, label: 'My Inventory' },
-                    { path: '/vendor/orders', icon: <ShoppingCart size={20} />, label: 'Orders' },
-                    { path: '/vendor/settings', icon: <Settings size={20} />, label: 'Settings' },
-                ];
-            case 'user':
-                return [
-                    { path: '/user/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-                    { path: '/user/search', icon: <Search size={20} />, label: 'Search Diamonds' },
-                    { path: '/user/orders', icon: <ShoppingCart size={20} />, label: 'My Orders' },
-                    { path: '/user/profile', icon: <UserIcon size={20} />, label: 'Profile' },
-                ];
-            case 'admin':
-            default:
-                return [
-                    { path: '/admin/dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
-                    { path: '/admin/inventory', icon: <Gem size={20} />, label: 'All Inventory' },
-                    { path: '/admin/users', icon: <Users size={20} />, label: 'Manage Users' },
-                    { path: '/admin/settings', icon: <Settings size={20} />, label: 'Settings' },
-                ];
-        }
-    };
-
-    const navLinks = getNavLinks();
 
     return (
         <div className="dashboard-layout">
@@ -64,9 +20,12 @@ const Layout = ({ children, title }) => {
                 <div className="sidebar-header">
                     <img src="/logo.png" alt="Hey Diamond" className="sidebar-logo" />
                 </div>
+                <div style={{ padding: '12px 20px', fontSize: '12px', fontWeight: 'bold', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '1px', borderBottom: '1px solid var(--color-input-border)' }}>
+                    {role} Panel
+                </div>
                 <nav className="sidebar-nav">
-                    {navLinks.map((link) => (
-                        <Link key={link.path} to={link.path} className={`nav-item ${isActive(link.path)}`}>
+                    {links.map((link, index) => (
+                        <Link key={index} to={link.path} className={`nav-item ${isActive(link.path)}`}>
                             {link.icon}
                             <span>{link.label}</span>
                         </Link>
@@ -90,10 +49,10 @@ const Layout = ({ children, title }) => {
                             <Bell size={20} />
                         </button>
                         <div className="user-profile">
-                            <div className="avatar">{role.charAt(0).toUpperCase()}</div>
+                            <div className="avatar">{role.charAt(0)}</div>
                             <div className="user-info">
-                                <span className="user-name">{role === 'admin' ? 'Admin User' : role === 'vendor' ? 'Vendor Account' : 'Customer'}</span>
-                                <span className="user-role" style={{ textTransform: 'capitalize' }}>{role}</span>
+                                <span className="user-name">Test {role}</span>
+                                <span className="user-role">{role}</span>
                             </div>
                         </div>
                     </div>
