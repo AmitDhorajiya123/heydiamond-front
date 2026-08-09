@@ -4,6 +4,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
+import Users from './pages/Users';
+import Inventory from './pages/Inventory';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -15,6 +18,9 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
     </Router>
