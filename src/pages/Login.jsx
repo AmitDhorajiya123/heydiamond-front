@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, EyeOff, Eye } from 'lucide-react';
+import { Mail, Lock, EyeOff, Eye, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import '../css/Auth.css';
 
@@ -8,6 +8,7 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [role, setRole] = useState('admin');
     const [errors, setErrors] = useState({});
 
     const handleSubmit = (e) => {
@@ -21,9 +22,9 @@ const Login = () => {
             return;
         }
 
-        // Proceed with login logic here
-        console.log('Login submitted', { email, password });
-        navigate('/dashboard');
+        // Save role and redirect
+        localStorage.setItem('userRole', role);
+        navigate(`/${role}/dashboard`);
     };
 
     return (
@@ -38,6 +39,35 @@ const Login = () => {
                 <p className="subtitle">Access your premium diamond trading account</p>
 
                 <form className="login-form" onSubmit={handleSubmit}>
+                    <div className="input-group">
+                        <label htmlFor="role">Login As</label>
+                        <div className="input-wrapper">
+                            <Shield className="input-icon" size={18} />
+                            <select
+                                id="role"
+                                value={role}
+                                onChange={(e) => setRole(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 16px 14px 44px',
+                                    border: '1px solid var(--color-input-border)',
+                                    borderRadius: '12px',
+                                    backgroundColor: 'var(--color-input-bg)',
+                                    fontFamily: 'var(--font-sans)',
+                                    fontSize: '14px',
+                                    color: 'var(--color-text-dark)',
+                                    outline: 'none',
+                                    appearance: 'none',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <option value="admin">Admin</option>
+                                <option value="vendor">Vendor</option>
+                                <option value="user">User</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div className="input-group">
                         <label htmlFor="email">Email or Username</label>
                         <div className="input-wrapper">
