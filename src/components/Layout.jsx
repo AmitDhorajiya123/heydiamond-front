@@ -1,16 +1,22 @@
 import React from 'react';
 import {
     LayoutDashboard,
-    Gem,
-    Users,
-    Settings,
+    Search,
+    Package,
+    ShoppingCart,
+    Clock,
     LogOut,
-    Bell
+    Bell,
+    Phone,
+    Menu,
+    User,
+    Mail,
+    GitCompare
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../css/Dashboard.css';
 
-const Layout = ({ children, title }) => {
+const Layout = ({ children }) => {
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -33,22 +39,34 @@ const Layout = ({ children, title }) => {
                         <span>Dashboard</span>
                     </Link>
                     <Link to="/inventory" className={`nav-item ${isActive('/inventory')}`}>
-                        <Gem size={20} />
-                        <span>Inventory</span>
+                        <Search size={20} />
+                        <span>Diamonds Search</span>
                     </Link>
-                    <Link to="/users" className={`nav-item ${isActive('/users')}`}>
-                        <Users size={20} />
-                        <span>Users</span>
+                    <Link to="/new-arrivals" className={`nav-item ${isActive('/new-arrivals')}`}>
+                        <Package size={20} />
+                        <span>New Arrival Stock</span>
                     </Link>
-                    <Link to="/settings" className={`nav-item ${isActive('/settings')}`}>
-                        <Settings size={20} />
-                        <span>Settings</span>
+                    <Link to="/orders" className={`nav-item ${isActive('/orders')}`}>
+                        <ShoppingCart size={20} />
+                        <span>My Order</span>
+                    </Link>
+                    <Link to="/hold-requests" className={`nav-item ${isActive('/hold-requests')}`}>
+                        <Clock size={20} />
+                        <span>My Hold Request</span>
+                    </Link>
+                    <Link to="/cart" className={`nav-item ${isActive('/cart')}`}>
+                        <ShoppingCart size={20} />
+                        <span>My Cart</span>
+                    </Link>
+                    <Link to="/compare" className={`nav-item ${isActive('/compare')}`}>
+                        <GitCompare size={20} />
+                        <span>View Compare</span>
                     </Link>
                 </nav>
                 <div className="sidebar-nav" style={{ flex: 'none', borderTop: '1px solid var(--color-input-border)' }}>
                     <button onClick={handleLogout} className="nav-item" style={{ background: 'none', border: 'none', width: '100%', cursor: 'pointer' }}>
                         <LogOut size={20} />
-                        <span>Logout</span>
+                        <span>Log Out</span>
                     </button>
                 </div>
             </aside>
@@ -57,16 +75,49 @@ const Layout = ({ children, title }) => {
             <main className="main-content">
                 {/* Header */}
                 <header className="header">
-                    <h1 className="header-title">{title}</h1>
-                    <div className="header-actions">
-                        <button className="action-btn">
-                            <Bell size={20} />
+                    <div className="header-left">
+                        <button className="menu-toggle">
+                            <Menu size={24} />
                         </button>
-                        <div className="user-profile">
-                            <div className="avatar">U</div>
-                            <div className="user-info">
-                                <span className="user-name">HeyDiamond User</span>
-                                <span className="user-role">Member</span>
+                        <div className="header-search">
+                            <Search size={18} className="search-icon" />
+                            <input type="text" placeholder="Search..." />
+                        </div>
+                    </div>
+
+                    <div className="header-right">
+                        <div className="seller-detail">
+                            <strong>Your Seller Detail:</strong>
+                            <div className="seller-info">
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={12} /> Anand</span>
+                                <span>/</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Phone size={12} /> 6353388010</span>
+                                <span>/</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={12} /> anand@heydiamond.com</span>
+                            </div>
+                        </div>
+
+                        <div className="header-icons">
+                            <button className="icon-btn">
+                                <Bell size={18} />
+                                <span className="badge">0</span>
+                            </button>
+                            <button className="icon-btn">
+                                <Phone size={18} />
+                            </button>
+                            <button className="icon-btn">
+                                <ShoppingCart size={18} />
+                                <span className="badge">0</span>
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--color-input-border)', paddingLeft: '16px' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <User size={20} />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', fontSize: '12px' }}>
+                                <span style={{ color: 'var(--color-text-light)' }}>Welcome,</span>
+                                <span style={{ color: 'var(--color-primary)', fontWeight: '600' }}>Admin User</span>
                             </div>
                         </div>
                     </div>
