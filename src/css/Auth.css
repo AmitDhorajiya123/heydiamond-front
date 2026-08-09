@@ -1,0 +1,220 @@
+.login-container {
+    position: relative;
+    width: 100vw;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px 20px;
+    box-sizing: border-box;
+}
+
+.login-background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-image: url('/bg.png');
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.85);
+    z-index: -1;
+}
+
+.login-card {
+    background-color: var(--color-bg-card);
+    border-radius: 24px;
+    padding: 40px 48px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Fix autofill background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px var(--color-input-bg) inset !important;
+    -webkit-text-fill-color: var(--color-text-dark) !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+.logo-container {
+    margin-bottom: 24px;
+}
+
+.logo {
+    width: 120px;
+    height: auto;
+    object-fit: contain;
+}
+
+.title {
+    font-family: var(--font-serif);
+    font-size: 32px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: var(--color-text-light);
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.login-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #4a4a4a;
+}
+
+.input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 16px;
+    color: #8c8c8c;
+}
+
+.input-wrapper input {
+    width: 100%;
+    padding: 14px 16px 14px 44px;
+    border: 1px solid var(--color-input-border);
+    border-radius: 12px;
+    background-color: var(--color-input-bg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--color-text-dark);
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.input-wrapper input:focus {
+    border-color: var(--color-primary);
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(166, 124, 82, 0.1);
+}
+
+.input-wrapper input::placeholder {
+    color: #a0a0a0;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 16px;
+    background: none;
+    border: none;
+    color: #8c8c8c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+}
+
+.toggle-password:hover {
+    color: var(--color-text-dark);
+}
+
+.forgot-password {
+    text-align: right;
+    margin-top: -8px;
+}
+
+.forgot-password a {
+    font-size: 13px;
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.forgot-password a:hover {
+    color: var(--color-primary-hover);
+}
+
+.submit-button {
+    background-color: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--font-serif);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    margin-top: 8px;
+}
+
+.submit-button:hover {
+    background-color: var(--color-primary-hover);
+}
+
+.submit-button:active {
+    transform: translateY(1px);
+}
+
+.register-link {
+    margin-top: 24px;
+    font-size: 14px;
+    color: var(--color-text-light);
+}
+
+.register-link a {
+    color: var(--color-primary);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.register-link a:hover {
+    color: var(--color-primary-hover);
+}
+
+.error-text {
+    color: #d93025;
+    font-size: 12px;
+    margin-top: 4px;
+    margin-left: 4px;
+}
+
+a:focus {
+    outline: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .login-card {
+        padding: 32px 24px;
+        width: 90%;
+        border-radius: 20px;
+    }
+}
