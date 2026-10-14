@@ -4,14 +4,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
-import Users from './pages/Users';
-import Inventory from './pages/Inventory';
-import Settings from './pages/Settings';
-import NewArrivals from './pages/NewArrivals';
-import Orders from './pages/Orders';
-import HoldRequests from './pages/HoldRequests';
-import Cart from './pages/Cart';
-import Compare from './pages/Compare';
+import Category from './pages/Category';
+import BgmBlackOption from './pages/BgmBlackOption';
 
 function App() {
   return (
@@ -24,14 +18,9 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
 
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/new-arrivals" element={<NewArrivals />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/hold-requests" element={<HoldRequests />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/compare" element={<Compare />} />
+          <Route path="/category" element={<Category />} />
+          <Route path="/bgm-black-option" element={<BgmBlackOption />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
     </Router>

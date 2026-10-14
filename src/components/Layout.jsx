@@ -1,19 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
     LayoutDashboard,
-    Search,
-    Package,
-    ShoppingCart,
-    Clock,
     LogOut,
     Bell,
     Phone,
     Menu,
     User,
     Mail,
-    GitCompare,
+    ShoppingCart,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Package,
+    Search
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../css/Dashboard.css';
@@ -58,29 +56,13 @@ const Layout = ({ children }) => {
                         <LayoutDashboard size={20} />
                         <span>Dashboard</span>
                     </Link>
-                    <Link to="/inventory" className={`nav-item ${isActive('/inventory')}`} title="Diamonds Search">
-                        <Search size={20} />
-                        <span>Diamonds Search</span>
-                    </Link>
-                    <Link to="/new-arrivals" className={`nav-item ${isActive('/new-arrivals')}`} title="New Arrival Stock">
+                    <Link to="/category" className={`nav-item ${isActive('/category')}`} title="Category">
                         <Package size={20} />
-                        <span>New Arrival Stock</span>
+                        <span>Category</span>
                     </Link>
-                    <Link to="/orders" className={`nav-item ${isActive('/orders')}`} title="My Order">
-                        <ShoppingCart size={20} />
-                        <span>My Order</span>
-                    </Link>
-                    <Link to="/hold-requests" className={`nav-item ${isActive('/hold-requests')}`} title="My Hold Request">
-                        <Clock size={20} />
-                        <span>My Hold Request</span>
-                    </Link>
-                    <Link to="/cart" className={`nav-item ${isActive('/cart')}`} title="My Cart">
-                        <ShoppingCart size={20} />
-                        <span>My Cart</span>
-                    </Link>
-                    <Link to="/compare" className={`nav-item ${isActive('/compare')}`} title="View Compare">
-                        <GitCompare size={20} />
-                        <span>View Compare</span>
+                    <Link to="/bgm-black-option" className={`nav-item ${isActive('/bgm-black-option')}`} title="BGM / Black Option">
+                        <Package size={20} />
+                        <span>BGM / Black Option</span>
                     </Link>
                 </nav>
                 <div className="sidebar-nav" style={{ flex: 'none', borderTop: '1px solid var(--color-input-border)' }}>
