@@ -212,6 +212,26 @@ input:-webkit-autofill:active {
     margin-left: 4px;
 }
 
+.auth-alert {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: #d93025;
+    background-color: #fce8e6;
+    border: 1px solid #f5c6cb;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    box-sizing: border-box;
+}
+
+.auth-alert svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
 a:focus {
     outline: none;
 }
