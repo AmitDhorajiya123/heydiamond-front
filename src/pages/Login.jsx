@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Mail, Lock, EyeOff, Eye, AlertCircle, Loader2 } from 'lucide-react';
 import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import '../css/Auth.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -10,6 +11,7 @@ const Login = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { login, isAuthenticated, booting } = useAuth();
+    const { showToast } = useToast();
 
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
@@ -46,6 +48,7 @@ const Login = () => {
         try {
             const res = await login(email.trim(), password);
             if (res?.success) {
+                showToast(res?.message || 'Login successful! Welcome back.', 'success');
                 navigate(location.state?.from || '/dashboard', { replace: true });
             } else {
                 setGeneralError(res?.message || 'Login failed. Please try again.');

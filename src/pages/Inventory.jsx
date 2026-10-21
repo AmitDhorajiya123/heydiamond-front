@@ -1,237 +1,1181 @@
-import React, { useState } from 'react';
-import { Search, RotateCcw, ChevronDown, Bookmark, MapPin, Gem } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+    Plus,
+    Edit,
+    Trash2,
+    Search,
+    X,
+    Loader2,
+    AlertCircle,
+    ChevronLeft,
+    ChevronRight,
+    ChevronUp,
+    ChevronDown,
+    RefreshCw,
+    Image as ImageIcon,
+    Video,
+    Play,
+    Download,
+    Columns,
+    ExternalLink,
+    CheckSquare,
+    Square,
+    Copy,
+    Eye
+} from 'lucide-react';
 import Layout from '../components/Layout';
-import '../css/Search.css';
+import Pagination from '../components/Pagination';
+import diamondApi from '../apis/diamond';
+import { useToast } from '../context/ToastContext';
 
-const shapes = [
-    { id: 'round', label: 'ROUND' },
-    { id: 'princess', label: 'PRINCESS' },
-    { id: 'pear', label: 'PEAR' },
-    { id: 'cushion', label: 'CUSHION' },
-    { id: 'heart', label: 'HEART' },
-    { id: 'oval', label: 'OVAL' },
-    { id: 'emerald', label: 'EMERALD' },
-    { id: 'radiant', label: 'RADIANT' },
-    { id: 'trilliant', label: 'TRILLIANT' },
-    { id: 'rose', label: 'ROSE' },
-    { id: 'asscher', label: 'ASSCHER' },
-    { id: 'marquise', label: 'MARQUISE' }
-];
+// Media Preview Modal Component
+const MediaPreviewModal = ({ isOpen, onClose, media }) => {
+    if (!isOpen || !media) return null;
 
-const colors = ['D', 'E', 'F', 'G', 'H', 'I'];
-const clarities = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2'];
-const cutPolSym = ['3EX', '3VG+', '3VG-'];
-const fluorescence = ['NONE', 'FNT', 'MED', 'STG', 'VST', 'SLT', 'VSL'];
-const labs = ['GIA', 'IGI', 'NONE'];
-const growthTypes = ['CVD', 'HPHT'];
+    const { type, url, title } = media;
+    const [useIframeFallback, setUseIframeFallback] = useState(false);
+    const [mediaError, setMediaError] = useState(false);
 
-const Inventory = () => {
-    const [selectedShape, setSelectedShape] = useState('oval');
-    const [selectedClarity, setSelectedClarity] = useState('VS2');
-    const [selectedLocation, setSelectedLocation] = useState('SURAT');
+    useEffect(() => {
+        setUseIframeFallback(false);
+        setMediaError(false);
+    }, [url]);
+
+    // Check if the URL is clearly a direct video file extension (.mp4, .webm, .mov, etc.)
+    const cleanUrl = (url || '').split('?')[0].toLowerCase();
+    const isDirectVideo = /\.(mp4|webm|ogg|mov|m4v)$/i.test(cleanUrl);
+
+    // Diamond videos (like VDB, Segoma, Vision360, YouTube, etc.) are web players, so they require an iframe.
+    const shouldRenderIframe = (type === 'video' && !isDirectVideo) || useIframeFallback || type === 'iframe';
 
     return (
-        <Layout title="Search Stones">
-            <div className="search-container">
-                <h2 className="search-title">Search Stones</h2>
-
-                {/* Location Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Location</span>
-                        <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
+        <div className="media-modal-overlay" onClick={onClose}>
+            <div className="media-modal-container" onClick={(e) => e.stopPropagation()}>
+                <div className="media-modal-header">
+                    <h3 className="media-modal-title">{title}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {type === 'video' && (
+                            <button
+                                type="button"
+                                onClick={() => setUseIframeFallback(prev => !prev)}
+                                title={shouldRenderIframe ? "Switch to Video Player" : "Switch to 360/Web Player"}
+                                style={{
+                                    fontSize: '12px',
+                                    fontWeight: 500,
+                                    padding: '5px 12px',
+                                    color: '#ffffff',
+                                    border: '1px solid rgba(255,255,255,0.25)',
+                                    borderRadius: '6px',
+                                    background: 'rgba(255,255,255,0.1)',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {shouldRenderIframe ? "Switch to MP4 Player" : "Switch to 360/Web View"}
+                            </button>
+                        )}
+                        <button className="media-modal-close" onClick={onClose} aria-label="Close modal">
+                            <X size={24} />
+                        </button>
                     </div>
-                    <div className="filter-options" style={{ justifyContent: 'space-between', width: '100%' }}>
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            {['SURAT', 'NY', 'MUMBAI', 'USA JEW'].map(loc => (
-                                <button
-                                    key={loc}
-                                    className={`filter-btn ${selectedLocation === loc ? 'active' : ''}`}
-                                    onClick={() => setSelectedLocation(loc)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                </div>
+                <div className="media-modal-body">
+                    {type === 'image' && url && !mediaError && (
+                        <img
+                            src={url}
+                            alt={title}
+                            className="media-preview-image"
+                            onError={() => setMediaError(true)}
+                        />
+                    )}
+
+                    {type === 'video' && url && !shouldRenderIframe && !mediaError && (
+                        <video
+                            className="media-preview-video"
+                            controls
+                            autoPlay
+                            playsInline
+                            crossOrigin="anonymous"
+                            src={url}
+                            onError={() => {
+                                // If direct video fails to decode (e.g. web page URL), automatically switch to iframe viewer
+                                setUseIframeFallback(true);
+                            }}
+                        >
+                            Your browser does not support the video tag.
+                        </video>
+                    )}
+
+                    {shouldRenderIframe && url && !mediaError && (
+                        <iframe 
+                            className="media-preview-iframe" 
+                            src={url} 
+                            title={title}
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            style={{
+                                width: '100%',
+                                height: '70vh',
+                                border: 'none',
+                                borderRadius: '8px',
+                                backgroundColor: '#000000'
+                            }}
+                        />
+                    )}
+
+                    {(!url || mediaError) && (
+                        <div className="media-placeholder">
+                            <AlertCircle size={48} style={{ color: 'var(--color-text-light)' }} />
+                            <p style={{ marginTop: '12px', color: '#ffffff' }}>
+                                {mediaError ? 'Unable to load media directly in modal' : 'No media available'}
+                            </p>
+                            {url && (
+                                <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="media-download-link"
+                                    style={{ marginTop: '16px' }}
                                 >
-                                    <MapPin size={14} /> {loc}
-                                </button>
-                            ))}
+                                    <ExternalLink size={16} style={{ marginRight: '6px' }} />
+                                    Open Link Directly in New Tab
+                                </a>
+                            )}
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button className="filter-btn active" style={{ borderRadius: '20px 0 0 20px', margin: 0, borderRight: 'none' }}>All</button>
-                            <button className="filter-btn" style={{ borderRadius: '0 20px 20px 0', margin: 0, backgroundColor: '#008b8b', color: 'white', borderColor: '#008b8b' }}>BookMarked</button>
-                        </div>
-                    </div>
+                    )}
                 </div>
-
-                {/* Shape Row */}
-                <div className="filter-row">
-                    <div className="shape-options">
-                        {shapes.map(shape => (
-                            <button
-                                key={shape.id}
-                                className={`shape-btn ${selectedShape === shape.id ? 'active' : ''}`}
-                                onClick={() => setSelectedShape(shape.id)}
-                            >
-                                <Gem className="shape-icon" />
-                                <span className="shape-label">{shape.label}</span>
-                            </button>
-                        ))}
+                {url && (
+                    <div className="media-modal-footer">
+                        <a 
+                            href={url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="media-download-link"
+                        >
+                            <ExternalLink size={16} style={{ marginRight: '6px' }} />
+                            Open in new tab
+                        </a>
                     </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Column Visibility Modal Component
+const ColumnVisibilityModal = ({ isOpen, onClose, columns, visibleColumns, onToggleColumn, onSelectAll, onSelectNone }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-container" style={{ maxWidth: '450px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h2 className="modal-title">Column Visibility</h2>
+                    <button className="modal-close" onClick={onClose}>
+                        <X size={20} />
+                    </button>
                 </div>
-
-                {/* Size Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Size<br />(Carats)</span>
+                <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                    <div className="column-visibility-actions" style={{ display: 'flex', gap: '8px', marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--color-input-border)' }}>
+                        <button
+                            type="button"
+                            className="submit-button secondary"
+                            onClick={onSelectAll}
+                            style={{ flex: 1 }}
+                        >
+                            <CheckSquare size={14} style={{ marginRight: '6px' }} />
+                            Select All
+                        </button>
+                        <button
+                            type="button"
+                            className="submit-button secondary"
+                            onClick={onSelectNone}
+                            style={{ flex: 1 }}
+                        >
+                            <Square size={14} style={{ marginRight: '6px' }} />
+                            Select None
+                        </button>
                     </div>
-                    <div className="filter-options" style={{ flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '24px', flexWrap: 'wrap' }}>
-                            <div className="range-inputs">
-                                <div className="range-input-wrapper">
-                                    <label>From</label>
-                                    <input type="text" className="range-input" placeholder="0.00" />
-                                </div>
-                                <div className="range-input-wrapper">
-                                    <label>To</label>
-                                    <input type="text" className="range-input" placeholder="0.00" />
-                                </div>
-                            </div>
-                            <button className="reset-btn" style={{ marginBottom: '10px' }}><RotateCcw size={12} /> Reset</button>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                                <span className="filter-label">StoneNo./Certificate No.</span>
-                                <div style={{ position: 'relative' }}>
-                                    <input type="text" className="search-large-input" placeholder="Enter Stone/Cert. number" />
-                                    <Search size={16} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
-                                </div>
-                                <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                            <button className="filter-btn active" style={{ borderBottom: '2px solid var(--color-primary)', borderRadius: 0, padding: '4px 8px', background: 'none', color: 'var(--color-text-dark)' }}>0.000 - 0.220</button>
-                            <button className="filter-btn" style={{ border: 'none', background: 'none' }}>0.230 - 0.290</button>
-                            <button className="filter-btn" style={{ border: 'none', background: 'none' }}>0.300 - 0.390</button>
-                            <button className="filter-btn" style={{ border: 'none', background: 'none' }}>0.400 - 0.490</button>
-                        </div>
-                    </div>
+                    {columns.map((col) => (
+                        <label key={col.key} className="column-toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={visibleColumns.includes(col.key)}
+                                onChange={() => onToggleColumn(col.key)}
+                                className="column-toggle-input"
+                            />
+                            <span className="column-toggle-text">{col.label}</span>
+                        </label>
+                    ))}
                 </div>
-
-                {/* Color Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Color</span>
-                        <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                    </div>
-                    <div className="filter-options">
-                        {colors.map(c => (
-                            <button key={c} className="filter-btn">{c}</button>
-                        ))}
-                    </div>
+                <div className="modal-footer">
+                    <button
+                        type="button"
+                        className="submit-button"
+                        onClick={onClose}
+                    >
+                        Done
+                    </button>
                 </div>
+            </div>
+        </div>
+    );
+};
 
-                {/* Clarity Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Clarity</span>
-                        <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                    </div>
-                    <div className="filter-options">
-                        {clarities.map(c => (
-                            <button
-                                key={c}
-                                className={`filter-btn ${selectedClarity === c ? 'active' : ''}`}
-                                onClick={() => setSelectedClarity(c)}
-                                style={selectedClarity === c ? { backgroundColor: 'transparent', color: 'var(--color-primary)', borderColor: 'var(--color-primary)' } : {}}
-                            >
-                                {c}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+// Define all available columns - EXACT match to Laravel blade template column order
+// Defined outside component so it's available for useState initializer
+const allColumns = [
+    // Core Identification (matching Laravel table order)
+    { key: 'id', label: 'ID', width: '60px' },
+    { key: 'stockNo', label: 'Stock No', width: '130px', required: true },
+    { key: 'status', label: 'Status', width: '100px' },
+    
+    // Basic Diamond Info
+    { key: 'shape', label: 'Shape', width: '100px' },
+    { key: 'Diamond_Type', label: 'Diamond Type', width: '120px' },
+    { key: 'weight', label: 'Weight (ct)', width: '90px' },
+    { key: 'color', label: 'Color', width: '80px' },
+    { key: 'clarity', label: 'Clarity', width: '80px' },
+    { key: 'cut', label: 'Cut', width: '80px' },
+    { key: 'polish', label: 'Polish', width: '80px' },
+    { key: 'symmetry', label: 'Symmetry', width: '90px' },
+    
+    // Fluorescence
+    { key: 'fluorescenceIntensity', label: 'Fluor. Intensity', width: '110px' },
+    { key: 'fluorescenceColor', label: 'Fluor. Color', width: '100px' },
+    
+    // Measurements
+    { key: 'measurements', label: 'Measurements', width: '140px' },
+    { key: 'shade', label: 'Shade', width: '90px' },
+    { key: 'BGM', label: 'BGM', width: '70px' },
+    { key: 'milky', label: 'Milky', width: '70px' },
+    { key: 'eyeClean', label: 'Eye Clean', width: '80px' },
+    
+    // Certification
+    { key: 'lab', label: 'Lab', width: '80px' },
+    { key: 'reportNo', label: 'Report No', width: '120px' },
+    { key: 'reportDate', label: 'Report Date', width: '120px' },
+    { key: 'location', label: 'Location', width: '100px' },
+    
+    // Treatment & Proportions
+    { key: 'treatment', label: 'Treatment', width: '100px' },
+    { key: 'ratio', label: 'Ratio', width: '70px' },
+    { key: 'growthType', label: 'Growth Type', width: '100px' },
+    { key: 'rapPricePerCt', label: 'Rap $/ct', width: '100px' },
+    
+    // Proportions
+    { key: 'depth', label: 'Depth %', width: '80px' },
+    { key: 'table', label: 'Table %', width: '80px' },
+    { key: 'girdleThin', label: 'Girdle Thin', width: '100px' },
+    { key: 'girdleThick', label: 'Girdle Thick', width: '100px' },
+    { key: 'gridlePer', label: 'Girdle %', width: '80px' },
+    { key: 'girdleCondition', label: 'Girdle Cond.', width: '100px' },
+    { key: 'culetSize', label: 'Culet Size', width: '90px' },
+    { key: 'ciletCondition', label: 'Culet Cond.', width: '90px' },
+    { key: 'crownHeight', label: 'Crown Height', width: '100px' },
+    { key: 'crownAngle', label: 'Crown Angle', width: '100px' },
+    { key: 'pavilionDepth', label: 'Pavilion Depth', width: '110px' },
+    { key: 'pavilionAngle', label: 'Pavilion Angle', width: '110px' },
+    { key: 'starLength', label: 'Star Length', width: '100px' },
+    
+    // Inscriptions
+    { key: 'inscription', label: 'Inscription', width: '100px' },
+    { key: 'laserInscription', label: 'Laser Inscription', width: '130px' },
+    
+    // Certificate Details
+    { key: 'certiComment', label: 'Cert Comment', width: '140px' },
+    { key: 'keyToSymbole', label: 'Key to Symbols', width: '120px' },
+    
+    // Inclusions
+    { key: 'inclusion', label: 'Inclusion', width: '100px' },
+    { key: 'whiteInclusion', label: 'White Incl.', width: '100px' },
+    { key: 'blackInclusion', label: 'Black Incl.', width: '100px' },
+    { key: 'openInclusion', label: 'Open Incl.', width: '100px' },
+    
+    // Fancy Color
+    { key: 'fancyColor', label: 'Fancy Color', width: '100px' },
+    { key: 'fancyColorIntensity', label: 'Fancy Intensity', width: '120px' },
+    { key: 'fancyColorOvertone', label: 'Fancy Overtone', width: '120px' },
+    
+    // Origin
+    { key: 'country', label: 'Country', width: '100px' },
+    { key: 'state', label: 'State', width: '100px' },
+    { key: 'city', label: 'City', width: '100px' },
+    
+    // CertiFile (file preview)
+    { key: 'certiFile', label: 'Certificate', width: '90px', media: 'file' },
+    
+    // Videos
+    { key: 'videoLink', label: 'Video', width: '90px', media: 'video' },
+    { key: 'vdbVideo', label: 'VDB Video', width: '100px', media: 'video' },
+    
+    // Images
+    { key: 'imageLink', label: 'Main Image', width: '90px', media: 'image' },
+    { key: 'heartImage', label: 'Heart Image', width: '100px', media: 'image' },
+    { key: 'arrowImage', label: 'Arrow Image', width: '100px', media: 'image' },
+    { key: 'assetImage', label: 'Asset Image', width: '100px', media: 'image' },
+    { key: 'heartAndArrow', label: 'H&A Image', width: '100px', media: 'image' },
+    
+    // Additional Characteristics
+    { key: 'luster', label: 'Luster', width: '80px' },
+    { key: 'brand', label: 'Brand', width: '100px' },
+    { key: 'origin', label: 'Origin', width: '100px' },
+    { key: 'COP', label: 'COP', width: '70px' },
+    { key: 'DNA', label: 'DNA', width: '180px' },
+    
+    // More Videos
+    { key: 'handyVideo', label: 'Handy Video', width: '100px', media: 'video' },
+    { key: 'supplierComment', label: 'Supplier Comment', width: '140px' },
+    { key: 'tinge', label: 'Tinge', width: '80px' },
+    { key: 'memberComment', label: 'Member Comment', width: '140px' },
+    
+    // Pair
+    { key: 'isPair', label: 'Is Pair', width: '80px' },
+    { key: 'pairStock', label: 'Pair Stock', width: '100px' },
+    
+    // More Videos
+    { key: 'tweezerVideo', label: 'Tweezer Video', width: '110px', media: 'video' },
+    
+    // Dimensions
+    { key: 'length', label: 'Length', width: '80px' },
+    { key: 'height', label: 'Height', width: '80px' },
+    { key: 'width', label: 'Width', width: '80px' },
+    
+    // Pricing
+    { key: 'pricePerCt', label: '$/ct', width: '90px' },
+    { key: 'totalPrice', label: 'Total $', width: '100px' },
+    { key: 'discount', label: 'Discount %', width: '90px' },
+    { key: 'exclusive', label: 'Exclusive', width: '90px' },
+    
+    // Date And Time (created_at)
+    { key: 'created_at', label: 'Date And Time', width: '140px' },
+    { key: 'updated_at', label: 'Updated', width: '140px' },
+];
+const Inventory = () => {
+    const { showToast } = useToast();
 
-                {/* Cut-Pol-Sym Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Cut-Pol-Sym</span>
-                        <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                    </div>
-                    <div className="filter-options" style={{ alignItems: 'center' }}>
-                        {cutPolSym.map(c => (
-                            <label key={c} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                                <input type="checkbox" /> {c}
-                            </label>
-                        ))}
-                    </div>
-                </div>
+    // Table data and pagination state
+    const [diamonds, setDiamonds] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
-                {/* Fluorescence Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Fluorescence</span>
-                        <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                    </div>
-                    <div className="filter-options">
-                        {fluorescence.map(f => (
-                            <button key={f} className="filter-btn">{f}</button>
-                        ))}
-                    </div>
-                </div>
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
+    const [perPage, setPerPage] = useState(25);
+    const [total, setTotal] = useState(0);
 
-                {/* Lab & Growth Type Row */}
-                <div className="filter-row">
-                    <div className="filter-label-group">
-                        <span className="filter-label">Lab</span>
-                        <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                    </div>
-                    <div className="filter-options" style={{ alignItems: 'center', gap: '24px' }}>
-                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                            {labs.map(l => (
-                                <button key={l} className="filter-btn" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', border: '1px solid #ccc' }}></div> {l}
-                                </button>
-                            ))}
-                        </div>
+    // Search and filter state
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    const [filters, setFilters] = useState({
+        shape: '',
+        color: '',
+        clarity: '',
+        cut: '',
+        lab: '',
+        status: '',
+    });
+    const [filterOptions, setFilterOptions] = useState({
+        shapes: [],
+        colors: [],
+        clarities: [],
+        cuts: [],
+        labs: [],
+        statuses: [],
+    });
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                            <div className="filter-label-group" style={{ width: 'auto' }}>
-                                <span className="filter-label">Growth Type</span>
-                                <button className="reset-btn"><RotateCcw size={12} /> Reset</button>
-                            </div>
-                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                {growthTypes.map(g => (
-                                    <button key={g} className="filter-btn">{g}</button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    // Sorting state
+    const [sortBy, setSortBy] = useState('id');
+    const [sortOrder, setSortOrder] = useState('desc');
 
-                {/* Accordions */}
-                <div className="accordion">
-                    <div className="accordion-header">
-                        <span>Advance Search</span>
-                        <ChevronDown size={20} />
-                    </div>
-                </div>
+    // Column visibility - Show ALL columns by default (like Yajra DataTables)
+    const [visibleColumns, setVisibleColumns] = useState(() => 
+        allColumns.map(c => c.key)
+    );
+    const [showColumnModal, setShowColumnModal] = useState(false);
 
-                <div className="accordion">
-                    <div className="accordion-header">
-                        <span>Key to Symbols</span>
-                        <ChevronDown size={20} />
+    // Media preview modal
+    const [mediaPreview, setMediaPreview] = useState(null);
+
+    // DNA details modal
+    const [dnaModal, setDnaModal] = useState(null);
+    const openDnaModal = (stockNo, value) => {
+        setDnaModal({ stockNo, value });
+    };
+
+    // Delete confirmation
+    const [deleteConfirm, setDeleteConfirm] = useState({
+        isOpen: false,
+        diamond: null,
+        loading: false,
+    });
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+            setCurrentPage(1);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const abortControllerRef = useRef(null);
+    const drawCounterRef = useRef(1);
+
+    // Fetch diamonds
+    const fetchDiamonds = useCallback(async () => {
+        // Cancel any pending request to prevent race conditions during rapid pagination
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
+        setLoading(true);
+        try {
+            const sortColumnIndex = allColumns.findIndex(c => c.key === sortBy);
+            const currentDraw = drawCounterRef.current++;
+
+            // Support BOTH Yajra DataTables parameters (start, length, draw, order)
+            // AND standard Laravel pagination parameters (page, per_page, limit, sort_by)
+            const params = {
+                // Yajra DataTables offset and length
+                draw: currentDraw,
+                start: (currentPage - 1) * perPage,
+                length: perPage,
+
+                // Standard Laravel pagination
+                page: currentPage,
+                per_page: perPage,
+                limit: perPage,
+
+                // Standard sorting
+                sort_by: sortBy,
+                sort_order: sortOrder,
+            };
+
+            // Yajra ordering
+            if (sortColumnIndex >= 0) {
+                params['order[0][column]'] = sortColumnIndex;
+                params['order[0][dir]'] = sortOrder;
+                params[`columns[${sortColumnIndex}][data]`] = sortBy;
+                params[`columns[${sortColumnIndex}][name]`] = sortBy;
+            }
+
+            // Search query for both Yajra (search[value]) and standard (search)
+            if (debouncedSearchTerm) {
+                params['search[value]'] = debouncedSearchTerm;
+                params.search = debouncedSearchTerm;
+            }
+
+            // Custom filters (shape, color, clarity, cut, lab, status)
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) params[key] = value;
+            });
+
+            const response = await diamondApi.list(params, { signal: controller.signal });
+
+            // Extract the payload (handles direct Yajra response or wrapped { success: true, data: { ... } })
+            let payload = response;
+            if (response && response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+                payload = response.data;
+            }
+
+            // 1. Extract the items array
+            let items = [];
+            if (Array.isArray(payload.data)) {
+                items = payload.data;
+            } else if (Array.isArray(response.data)) {
+                items = response.data;
+            } else if (Array.isArray(payload)) {
+                items = payload;
+            } else if (Array.isArray(response)) {
+                items = response;
+            }
+
+            // 2. Extract total records from all possible Yajra and Laravel pagination structures
+            const candidateTotal =
+                payload?.recordsFiltered ??
+                payload?.recordsTotal ??
+                response?.recordsFiltered ??
+                response?.recordsTotal ??
+                response?.data?.recordsFiltered ??
+                response?.data?.recordsTotal ??
+                payload?.total ??
+                response?.total ??
+                response?.data?.total ??
+                payload?.meta?.total ??
+                response?.meta?.total ??
+                payload?.total_count ??
+                response?.total_count ??
+                payload?.totalRecords ??
+                response?.totalRecords;
+
+            const totalRecords = candidateTotal !== undefined && candidateTotal !== null && !isNaN(Number(candidateTotal))
+                ? Number(candidateTotal)
+                : items.length;
+
+            // 3. Extract or compute last page and current page
+            const activePerPage = perPage || 25;
+            const calculatedLastPage = Math.max(1, Math.ceil(totalRecords / activePerPage));
+            const activeLastPage = Number(payload?.last_page || response?.last_page || response?.data?.last_page) || calculatedLastPage;
+            const activeCurrentPage = Number(payload?.current_page || response?.current_page || response?.data?.current_page) || currentPage;
+
+            setDiamonds(items);
+            setTotal(totalRecords);
+            setLastPage(activeLastPage);
+            setCurrentPage(activeCurrentPage);
+
+            // Extract filter options from the returned data (merge with existing)
+            if (Array.isArray(items) && items.length > 0) {
+                setFilterOptions(prev => ({
+                    shapes: prev.shapes.length ? prev.shapes : [...new Set(items.map(d => d.shape).filter(Boolean))].sort(),
+                    colors: prev.colors.length ? prev.colors : [...new Set(items.map(d => d.color).filter(Boolean))].sort(),
+                    clarities: prev.clarities.length ? prev.clarities : [...new Set(items.map(d => d.clarity).filter(Boolean))].sort(),
+                    cuts: prev.cuts.length ? prev.cuts : [...new Set(items.map(d => d.cut).filter(Boolean))].sort(),
+                    labs: prev.labs.length ? prev.labs : [...new Set(items.map(d => d.lab).filter(Boolean))].sort(),
+                    statuses: prev.statuses.length ? prev.statuses : [...new Set(items.map(d => d.status).filter(Boolean))].sort(),
+                }));
+            }
+        } catch (err) {
+            // Ignore canceled requests
+            if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+                return;
+            }
+            console.error('Error fetching diamonds:', err);
+            showToast(err.response?.data?.message || 'Failed to load diamonds', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, [currentPage, perPage, debouncedSearchTerm, filters, sortBy, sortOrder, showToast]);
+
+    useEffect(() => {
+        fetchDiamonds();
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, [fetchDiamonds]);
+
+    // Handle sync
+    const handleSync = async () => {
+        setSyncing(true);
+        try {
+            const response = await diamondApi.sync();
+            if (response.success) {
+                showToast(response.message || 'Diamonds synced successfully!', 'success');
+                fetchDiamonds();
+            } else {
+                showToast(response.message || 'Sync failed', 'error');
+            }
+        } catch (err) {
+            console.error('Sync error:', err);
+            showToast(err.response?.data?.message || 'Sync failed', 'error');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
+    // Handle sort
+    const handleSort = (column) => {
+        if (sortBy === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(column);
+            setSortOrder('asc');
+        }
+    };
+
+    // Column visibility toggle
+    const toggleColumn = (key) => {
+        setVisibleColumns(prev => 
+            prev.includes(key) 
+                ? prev.filter(k => k !== key) 
+                : [...prev, key]
+        );
+    };
+
+    // Clear all filters and reset to page 1
+    const clearFilters = () => {
+        setFilters({ shape: '', color: '', clarity: '', cut: '', lab: '', status: '' });
+        setCurrentPage(1);
+    };
+
+    // Media preview
+    const openMediaPreview = (type, url, title) => {
+        if (url) {
+            setMediaPreview({ type, url, title });
+        }
+    };
+
+    // Delete confirmation
+    const handleOpenDeleteConfirm = (diamond) => {
+        setDeleteConfirm({
+            isOpen: true,
+            diamond,
+            loading: false,
+        });
+    };
+
+    const handleCloseDeleteConfirm = () => {
+        setDeleteConfirm({
+            isOpen: false,
+            diamond: null,
+            loading: false,
+        });
+    };
+
+    const handleConfirmDelete = async () => {
+        const { diamond } = deleteConfirm;
+        if (!diamond) return;
+
+        setDeleteConfirm(prev => ({ ...prev, loading: true }));
+
+        try {
+            const response = await diamondApi.remove(diamond.id);
+            if (response.success) {
+                showToast(response.message || 'Diamond deleted successfully', 'success');
+                handleCloseDeleteConfirm();
+                fetchDiamonds();
+            } else {
+                showToast(response.message || 'Failed to delete diamond', 'error');
+                handleCloseDeleteConfirm();
+            }
+        } catch (err) {
+            console.error('Error deleting diamond:', err);
+            showToast(err.response?.data?.message || 'Failed to delete diamond', 'error');
+            handleCloseDeleteConfirm();
+        }
+    };
+
+    // Format date
+    const formatDate = (dateString) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    // Format currency
+    const formatCurrency = (value) => {
+        if (!value && value !== 0) return '-';
+        const num = Number(value);
+        if (isNaN(num)) return String(value);
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(num);
+    };
+
+    // Format weight
+    const formatWeight = (value) => {
+        if (!value && value !== 0) return '-';
+        const num = Number(value);
+        if (isNaN(num)) return String(value);
+        return num.toFixed(2) + ' ct';
+    };
+
+    // Render cell content
+    const renderCell = (diamond, column) => {
+        const value = diamond[column.key];
+        
+        if (!value && value !== 0) return <span style={{ color: 'var(--color-text-light)' }}>-</span>;
+
+        // Media columns
+        if (column.media === 'image' && value) {
+            return (
+                <button
+                    className="media-preview-btn"
+                    onClick={() => openMediaPreview('image', value, `${diamond.stockNo} - Image`)}
+                    title="View image"
+                >
+                    <ImageIcon size={16} />
+                </button>
+            );
+        }
+        
+        if (column.media === 'video' && value) {
+            return (
+                <button
+                    className="media-preview-btn"
+                    onClick={() => openMediaPreview('video', value, `${diamond.stockNo} - Video`)}
+                    title="View video"
+                >
+                    <Video size={16} />
+                </button>
+            );
+        }
+        
+        if (column.media === 'file' && value) {
+            return (
+                <a 
+                    href={value} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="media-preview-btn"
+                    title="View certificate"
+                >
+                    <Download size={16} />
+                </a>
+            );
+        }
+        
+        if (column.media === 'iframe' && value) {
+            return (
+                <button
+                    className="media-preview-btn"
+                    onClick={() => openMediaPreview('iframe', value, `${diamond.stockNo} - Video`)}
+                    title="View video"
+                >
+                    <Play size={16} />
+                </button>
+            );
+        }
+
+        // Format specific columns
+        switch (column.key) {
+            case 'weight':
+                return <span style={{ fontFamily: 'monospace' }}>{formatWeight(value)}</span>;
+            case 'pricePerCt':
+            case 'totalPrice':
+            case 'rapPricePerCt':
+                return <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>{formatCurrency(value)}</span>;
+            case 'discount':
+                return <span style={{ fontFamily: 'monospace' }}>{Number(value).toFixed(1)}%</span>;
+            case 'created_at':
+            case 'updated_at':
+            case 'reportDate':
+                return <span style={{ fontSize: '11px' }}>{formatDate(value)}</span>;
+            case 'depth':
+            case 'table':
+            case 'gridlePer':
+            case 'ratio':
+            case 'crownHeight':
+            case 'crownAngle':
+            case 'pavilionDepth':
+            case 'pavilionAngle':
+            case 'starLength':
+            case 'length':
+            case 'width':
+            case 'height':
+            case 'girdleThin':
+            case 'girdleThick':
+            case 'crownHeight':
+            case 'crownAngle':
+            case 'pavilionDepth':
+            case 'pavilionAngle':
+                return <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{String(value)}</span>;
+            case 'status':
+                return (
+                    <span className={`status-badge ${value?.toLowerCase() === 'available' ? 'status-available' : value?.toLowerCase() === 'sold' ? 'status-sold' : value?.toLowerCase() === 'reserved' ? 'status-reserved' : 'status-default'}`}>
+                        {value}
+                    </span>
+                );
+            case 'isPair':
+                return (
+                    <span className={`status-badge ${value === '1' || value === true || value === 'true' ? 'status-available' : 'status-default'}`}>
+                        {value === '1' || value === true || value === 'true' ? 'Yes' : 'No'}
+                    </span>
+                );
+            case 'exclusive':
+                return (
+                    <span className={`status-badge ${value === 'yes' || value === '1' || value === true || value === 'true' ? 'status-available' : 'status-default'}`}>
+                        {value}
+                    </span>
+                );
+            case 'milky':
+            case 'eyeClean':
+            case 'BGM':
+                return (
+                    <span className={`status-badge ${value === 'YES' || value === 'yes' || value === '1' || value === true ? 'status-available' : 'status-default'}`}>
+                        {value}
+                    </span>
+                );
+            case 'DNA': {
+                const strVal = String(value).trim();
+                const isUrl = /^https?:\/\//i.test(strVal) || strVal.startsWith('www.');
+                if (isUrl) {
+                    const href = strVal.startsWith('http') ? strVal : `https://${strVal}`;
+                    return (
+                        <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '3px 9px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                color: '#0d6efd',
+                                backgroundColor: '#e7f1ff',
+                                border: '1px solid #b6d4fe',
+                                borderRadius: '4px',
+                                textDecoration: 'none',
+                                whiteSpace: 'nowrap'
+                            }}
+                            title={`Open DNA Link: ${strVal}`}
+                        >
+                            <ExternalLink size={12} />
+                            <span>View DNA</span>
+                        </a>
+                    );
+                }
+                return (
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
+                        <span
+                            title={strVal}
+                            style={{
+                                fontFamily: 'monospace',
+                                fontSize: '11px',
+                                wordBreak: 'break-all',
+                                maxWidth: '180px',
+                                lineHeight: '1.3'
+                            }}
+                        >
+                            {strVal}
+                        </span>
+                        <button
+                            type="button"
+                            className="action-btn"
+                            onClick={() => openDnaModal(diamond.stockNo, strVal)}
+                            title="View Full DNA"
+                            style={{ padding: '2px 4px', height: 'auto', minWidth: 'auto', color: '#0d6efd' }}
+                        >
+                            <Eye size={13} />
+                        </button>
+                        <button
+                            type="button"
+                            className="action-btn"
+                            onClick={() => {
+                                navigator.clipboard?.writeText(strVal);
+                                showToast('DNA copied to clipboard!', 'success');
+                            }}
+                            title="Copy DNA"
+                            style={{ padding: '2px 4px', height: 'auto', minWidth: 'auto', color: '#6c757d' }}
+                        >
+                            <Copy size={13} />
+                        </button>
                     </div>
+                );
+            }
+            default:
+                return <span title={String(value)}>{String(value).length > 35 ? String(value).substring(0, 35) + '...' : String(value)}</span>;
+        }
+    };
+
+    return (
+        <Layout>
+            {/* Page Header */}
+            <div className="table-header">
+                <h1 className="table-title">Diamond Inventory</h1>
+                <div className="table-actions">
+                    {/* <button
+                        className="submit-button secondary"
+                        onClick={() => setShowColumnModal(true)}
+                        disabled={loading}
+                        title="Column Visibility"
+                    >
+                        <Columns size={16} style={{ marginRight: '8px' }} />
+                        Columns
+                    </button> */}
+                    <button
+                        className="submit-button"
+                        onClick={handleSync}
+                        disabled={loading || syncing}
+                    >
+                        <RefreshCw size={16} style={{ marginRight: '8px' }} className={syncing ? 'spin' : ''} />
+                        {syncing ? 'Syncing...' : 'Sync Diamonds'}
+                    </button>
                 </div>
             </div>
 
-            {/* Sticky Bottom Bar */}
-            <div className="sticky-bottom-bar">
-                <button className="action-btn-secondary" style={{ borderColor: '#008b8b', color: '#008b8b' }}>
-                    <Search size={18} /> Search Diamonds (12838)
-                </button>
-                <button className="action-btn-secondary">
-                    <Bookmark size={18} /> Saved & Search
-                </button>
-                <button className="action-btn-secondary" style={{ color: 'var(--color-text-dark)', borderColor: 'var(--color-input-border)' }}>
-                    <RotateCcw size={18} /> Reset
-                </button>
+            {/* Search and Filters Bar */}
+            <div className="filters-bar">
+                <div className="search-wrapper">
+                    <Search size={18} className="search-icon" />
+                    <input
+                        type="text"
+                        placeholder="Search by Stock No or Report No..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="search-input"
+                        disabled={loading}
+                    />
+                </div>
+                <div className="filters-wrapper">
+                    {[
+                        { key: 'shape', label: 'Shape', options: filterOptions.shapes },
+                        { key: 'color', label: 'Color', options: filterOptions.colors },
+                        { key: 'clarity', label: 'Clarity', options: filterOptions.clarities },
+                        { key: 'cut', label: 'Cut', options: filterOptions.cuts },
+                        { key: 'lab', label: 'Lab', options: filterOptions.labs },
+                        { key: 'status', label: 'Status', options: filterOptions.statuses },
+                    ].map(({ key, label, options }) => (
+                        <select
+                            key={key}
+                            value={filters[key]}
+                            onChange={(e) => setFilters(prev => ({ ...prev, [key]: e.target.value }))}
+                            className="filter-select"
+                            disabled={loading}
+                        >
+                            <option value="">All {label}</option>
+                            {options.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                        </select>
+                    ))}
+                    <button
+                        className="filter-clear-btn"
+                        onClick={clearFilters}
+                        disabled={loading || !Object.values(filters).some(v => v)}
+                    >
+                        <X size={14} style={{ marginRight: '4px' }} />
+                        Clear
+                    </button>
+                </div>
             </div>
+
+            {/* Data Table */}
+            <div className="table-container">
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                {allColumns
+                                    .filter(col => visibleColumns.includes(col.key) || col.required)
+                                    .map((column) => (
+                                        <th
+                                            key={column.key}
+                                            style={{ 
+                                                width: column.width,
+                                                cursor: 'default',
+                                                userSelect: 'none',
+                                                whiteSpace: 'nowrap'
+                                            }}
+                                        >
+                                            <div className="th-content">
+                                                <span>{column.label}</span>
+                                            </div>
+                                        </th>
+                                    ))}
+                                <th style={{ width: '100px' }}>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {diamonds.length === 0 ? (
+                                <tr>
+                                    <td colSpan={visibleColumns.filter(v => allColumns.some(c => c.key === v && !c.required)).length + 2} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-light)' }}>
+                                        {loading ? (
+                                            <>
+                                                <Loader2 size={24} className="spin" style={{ marginBottom: '12px', display: 'block', marginLeft: 'auto', marginRight: 'auto' }} />
+                                                <p>Loading diamonds...</p>
+                                            </>
+                                        ) : (
+                                            'No diamonds found'
+                                        )}
+                                    </td>
+                                </tr>
+                            ) : (
+                                diamonds.map((diamond, index) => (
+                                    <tr key={diamond.id}>
+                                        {allColumns
+                                            .filter(col => visibleColumns.includes(col.key) || col.required)
+                                            .map((column) => (
+                                                <td key={column.key} style={{ 
+                                                    fontSize: column.key === 'stockNo' ? '12px' : '11px',
+                                                    fontFamily: column.key === 'stockNo' || column.key === 'weight' || column.key === 'pricePerCt' || column.key === 'totalPrice' ? 'monospace' : 'inherit'
+                                                }}>
+                                                    {renderCell(diamond, column)}
+                                                </td>
+                                            ))}
+                                        <td>
+                                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-start' }}>
+                                                <button
+                                                    className="action-btn"
+                                                    onClick={() => handleOpenDeleteConfirm(diamond)}
+                                                    title="Delete"
+                                                    disabled={loading}
+                                                    style={{ color: '#d93025' }}
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Modern Enterprise Pagination (Optimized for millions of records) */}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={lastPage}
+                    totalItems={total}
+                    perPage={perPage}
+                    onPageChange={(page) => setCurrentPage(page)}
+                    onPerPageChange={(newPerPage) => {
+                        setPerPage(newPerPage);
+                        setCurrentPage(1);
+                    }}
+                    loading={loading}
+                    showPerPage={true}
+                    showInfo={true}
+                    showQuickJump={true}
+                />
+            </div>
+
+            {/* Media Preview Modal */}
+            {mediaPreview && (
+                <MediaPreviewModal
+                    isOpen={true}
+                    onClose={() => setMediaPreview(null)}
+                    media={mediaPreview}
+                />
+            )}
+
+            {/* Column Visibility Modal */}
+            <ColumnVisibilityModal
+                isOpen={showColumnModal}
+                onClose={() => setShowColumnModal(false)}
+                columns={allColumns}
+                visibleColumns={visibleColumns}
+                onToggleColumn={toggleColumn}
+                onSelectAll={() => setVisibleColumns(allColumns.map(c => c.key))}
+                onSelectNone={() => setVisibleColumns(['stockNo', 'status'])}
+            />
+
+            {/* DNA Details Modal */}
+            {dnaModal && (
+                <div className="modal-overlay" onClick={() => setDnaModal(null)}>
+                    <div className="modal-container" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">DNA Details &mdash; {dnaModal.stockNo}</h2>
+                            <button className="modal-close" onClick={() => setDnaModal(null)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--color-text-light)' }}>
+                                Full DNA Information for Stock No: <strong>{dnaModal.stockNo}</strong>
+                            </div>
+                            <div style={{
+                                padding: '14px',
+                                backgroundColor: 'var(--color-input-bg, #f8f9fa)',
+                                border: '1px solid var(--color-input-border, #dee2e6)',
+                                borderRadius: '6px',
+                                fontFamily: 'monospace',
+                                fontSize: '12px',
+                                wordBreak: 'break-all',
+                                maxHeight: '240px',
+                                overflowY: 'auto',
+                                lineHeight: '1.6',
+                                color: 'var(--color-text-dark, #212529)'
+                            }}>
+                                {dnaModal.value}
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            {/^https?:\/\//i.test(dnaModal.value) || dnaModal.value.startsWith('www.') ? (
+                                <a
+                                    href={dnaModal.value.startsWith('http') ? dnaModal.value : `https://${dnaModal.value}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="submit-button secondary"
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <ExternalLink size={14} />
+                                    Open Link
+                                </a>
+                            ) : null}
+                            <button
+                                type="button"
+                                className="submit-button"
+                                onClick={() => {
+                                    navigator.clipboard?.writeText(dnaModal.value);
+                                    showToast('DNA copied to clipboard!', 'success');
+                                }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                            >
+                                <Copy size={14} />
+                                Copy to Clipboard
+                            </button>
+                            <button
+                                type="button"
+                                className="submit-button secondary"
+                                onClick={() => setDnaModal(null)}
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {deleteConfirm.isOpen && (
+                <div className="modal-overlay" onClick={handleCloseDeleteConfirm}>
+                    <div className="modal-container modal-confirm" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2 className="modal-title">Delete Diamond</h2>
+                            <button className="modal-close" onClick={handleCloseDeleteConfirm}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ margin: 0, color: 'var(--color-text-dark)', lineHeight: '1.5' }}>
+                                Are you sure you want to delete diamond <strong>{deleteConfirm.diamond?.stockNo}</strong>? This action cannot be undone.
+                            </p>
+                        </div>
+                        <div className="modal-footer">
+                            <button
+                                type="button"
+                                className="submit-button secondary"
+                                onClick={handleCloseDeleteConfirm}
+                                disabled={deleteConfirm.loading}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="submit-button danger"
+                                onClick={handleConfirmDelete}
+                                disabled={deleteConfirm.loading}
+                            >
+                                {deleteConfirm.loading ? (
+                                    <>
+                                        <Loader2 size={16} className="spin" style={{ marginRight: '8px' }} />
+                                        Deleting...
+                                    </>
+                                ) : (
+                                    'Delete'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style jsx>{`
+                .spin {
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </Layout>
     );
 };

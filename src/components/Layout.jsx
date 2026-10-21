@@ -11,26 +11,13 @@ import {
     ChevronLeft,
     ChevronRight,
     Package,
-    Search
+    Search,
+    Gem,
+    RefreshCw
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../css/Dashboard.css';
-
-// Master pages - visible only to admin users (routes are guarded too).
-const MASTER_LINKS = [
-    { to: '/category', label: 'Category' },
-    { to: '/bgm-black-option', label: 'BGM / Black Option' },
-    { to: '/clarity', label: 'Clarity' },
-    { to: '/color', label: 'Color' },
-    { to: '/finish-grade', label: 'Finish Grade' },
-    { to: '/fluorescence', label: 'Fluorescence' },
-    { to: '/lab', label: 'Lab' },
-    { to: '/location', label: 'Location' },
-    { to: '/shape', label: 'Shape' },
-    { to: '/size-range', label: 'Size Range' },
-    { to: '/subcategory', label: 'Subcategory' },
-];
 
 const Layout = ({ children }) => {
     const location = useLocation();
@@ -83,12 +70,12 @@ const Layout = ({ children }) => {
                         <LayoutDashboard size={20} />
                         <span>Dashboard</span>
                     </Link>
-                    {isAdmin && MASTER_LINKS.map((link) => (
-                        <Link key={link.to} to={link.to} className={`nav-item ${isActive(link.to)}`} title={link.label}>
-                            <Package size={20} />
-                            <span>{link.label}</span>
+                    {isAdmin && (
+                        <Link to="/inventory" className={`nav-item ${isActive('/inventory')}`} title="Inventory">
+                            <Gem size={20} />
+                            <span>Inventory</span>
                         </Link>
-                    ))}
+                    )}
                 </nav>
                 <div className="sidebar-nav" style={{ flex: 'none', borderTop: '1px solid var(--color-input-border)' }}>
                     <button onClick={handleLogout} className="nav-item" style={{ background: 'none', border: 'none', width: '100%', cursor: 'pointer' }} title="Log Out">
@@ -112,23 +99,23 @@ const Layout = ({ children }) => {
                         <button className="mobile-menu-toggle" onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}>
                             <Menu size={24} />
                         </button>
-                        <div className="header-search">
+                        {/* <div className="header-search">
                             <Search size={18} className="search-icon" />
                             <input type="text" placeholder="Search..." />
-                        </div>
+                        </div> */}
                     </div>
 
                     <div className="header-right">
-                        <div className="seller-detail">
+                        {/* <div className="seller-detail">
                             <strong>Your Seller Detail:</strong>
                             <div className="seller-info">
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={12} /> {displayName}</span>
                                 <span>/</span>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Mail size={12} /> {displayEmail}</span>
                             </div>
-                        </div>
+                        </div> */}
 
-                        <div className="header-icons">
+                        {/* <div className="header-icons">
                             <button className="icon-btn">
                                 <Bell size={18} />
                                 <span className="badge">0</span>
@@ -140,7 +127,7 @@ const Layout = ({ children }) => {
                                 <ShoppingCart size={18} />
                                 <span className="badge">0</span>
                             </button>
-                        </div>
+                        </div> */}
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', borderLeft: '1px solid var(--color-input-border)', paddingLeft: '16px' }}>
                             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

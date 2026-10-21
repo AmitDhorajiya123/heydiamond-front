@@ -9,6 +9,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 import Layout from './Layout';
+import Pagination from './Pagination';
 import ToastContainer from './Toast';
 import ConfirmModal from './ConfirmModal';
 import ToggleSwitch from './ToggleSwitch';
@@ -447,6 +448,12 @@ const MasterPage = ({ config }) => {
             <div className="table-header">
                 <h1 className="table-title">{title}</h1>
                 <div className="table-actions">
+                    {loading && (
+                        <div className="header-loading" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-primary)' }}>
+                            <Loader2 size={16} className="spin" />
+                            <span style={{ fontSize: '13px', fontWeight: 500 }}>Loading...</span>
+                        </div>
+                    )}
                     <button
                         className="submit-button"
                         onClick={handleAdd}
@@ -460,13 +467,6 @@ const MasterPage = ({ config }) => {
 
             {/* Data Table */}
             <div className="table-container">
-                {loading && (
-                    <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-light)' }}>
-                        <Loader2 size={24} className="spin" style={{ marginBottom: '12px' }} />
-                        <p>Loading {title.toLowerCase()}...</p>
-                    </div>
-                )}
-
                 <div style={{ overflowX: 'auto' }}>
                     <table className="data-table">
                         <thead>
@@ -485,7 +485,7 @@ const MasterPage = ({ config }) => {
                             {items.length === 0 ? (
                                 <tr>
                                     <td colSpan={fields.length + 5} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-light)' }}>
-                                        {loading ? 'Loading...' : `No ${title.toLowerCase().replace(' management', '')} found`}
+                                        `No ${title.toLowerCase().replace(' management', '')} found`
                                     </td>
                                 </tr>
                             ) : (
@@ -540,69 +540,22 @@ const MasterPage = ({ config }) => {
                     </table>
                 </div>
 
-                {/* Pagination */}
-                {lastPage > 1 && (
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '16px 24px',
-                        borderTop: '1px solid var(--color-input-border)',
-                        flexWrap: 'wrap',
-                        gap: '16px'
-                    }}>
-                        <div style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>
-                            Showing {((currentPage - 1) * perPage) + 1} to {Math.min(currentPage * perPage, total)} of {total} entries
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                className="action-btn-secondary"
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1 || loading}
-                                style={{ padding: '8px 12px' }}
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            {Array.from({ length: Math.min(lastPage, 5) }, (_, i) => {
-                                let pageNum;
-                                if (lastPage <= 5) {
-                                    pageNum = i + 1;
-                                } else if (currentPage <= 3) {
-                                    pageNum = i + 1;
-                                } else if (currentPage >= lastPage - 2) {
-                                    pageNum = lastPage - 4 + i;
-                                } else {
-                                    pageNum = currentPage - 2 + i;
-                                }
-                                return (
-                                    <button
-                                        key={pageNum}
-                                        className={`action-btn-secondary ${currentPage === pageNum ? 'active' : ''}`}
-                                        onClick={() => handlePageChange(pageNum)}
-                                        disabled={loading}
-                                        style={{
-                                            padding: '8px 12px',
-                                            minWidth: '40px',
-                                            backgroundColor: currentPage === pageNum ? 'var(--color-primary)' : 'transparent',
-                                            color: currentPage === pageNum ? '#fff' : 'var(--color-text-dark)',
-                                            borderColor: currentPage === pageNum ? 'var(--color-primary)' : 'var(--color-input-border)'
-                                        }}
-                                    >
-                                        {pageNum}
-                                    </button>
-                                );
-                            })}
-                            <button
-                                className="action-btn-secondary"
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === lastPage || loading}
-                                style={{ padding: '8px 12px' }}
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                        </div>
-                    </div>
-                )}
+                {/* Modern Enterprise Pagination */}
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={lastPage}
+                    totalItems={total}
+                    perPage={perPage}
+                    onPageChange={(page) => handlePageChange(page)}
+                    onPerPageChange={(newPerPage) => {
+                        setPerPage(newPerPage);
+                        setCurrentPage(1);
+                    }}
+                    loading={loading}
+                    showPerPage={true}
+                    showInfo={true}
+                    showQuickJump={true}
+                />
             </div>
 
             {/* Add/Edit Modal */}
