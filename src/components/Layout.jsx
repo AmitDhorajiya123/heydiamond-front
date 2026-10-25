@@ -71,7 +71,7 @@ const Layout = ({ children }) => {
                         <span>Dashboard</span>
                     </Link>
                     {isAdmin && (
-                        <Link to="/inventory" className={`nav-item ${isActive('/inventory')}`} title="Inventory">
+                        <Link to="/inventory/filter" className={`nav-item ${isActive('/inventory') || isActive('/inventory/filter') || location.pathname.startsWith('/inventory/dna') ? 'active' : ''}`} title="Inventory">
                             <Gem size={20} />
                             <span>Inventory</span>
                         </Link>

@@ -8,6 +8,8 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
+import InventoryFilter from './pages/InventoryFilter';
+import DiamondDNA from './pages/DiamondDNA';
 
 function App() {
   return (
@@ -25,9 +27,19 @@ function App() {
                 <ProtectedRoute><Dashboard /></ProtectedRoute>
               } />
 
-              {/* Inventory - Diamond management with sync */}
+              {/* Inventory Filter Page - First page when clicking Inventory */}
+              <Route path="/inventory/filter" element={
+                <ProtectedRoute adminOnly><InventoryFilter /></ProtectedRoute>
+              } />
+
+              {/* Inventory - Diamond management with sync (results page) */}
               <Route path="/inventory" element={
                 <ProtectedRoute adminOnly><Inventory /></ProtectedRoute>
+              } />
+
+              {/* Our own Diamond DNA / stone details page */}
+              <Route path="/inventory/dna/:id" element={
+                <ProtectedRoute adminOnly><DiamondDNA /></ProtectedRoute>
               } />
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -7,6 +7,12 @@ export const diamondApi = {
         return response.data;
     },
 
+    // Same as list, but the filters travel in the request body (not the URL)
+    search: async (payload = {}, options = {}) => {
+        const response = await api.post('/diamonds/search', payload, options);
+        return response.data;
+    },
+
     // Get single diamond by ID
     get: async (id) => {
         const response = await api.get(`/diamonds/${id}`);

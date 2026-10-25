@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Plus,
     Edit,
@@ -20,8 +21,8 @@ import {
     ExternalLink,
     CheckSquare,
     Square,
-    Copy,
-    Eye
+    Filter,
+    ArrowLeft
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import Pagination from '../components/Pagination';
@@ -350,8 +351,55 @@ const allColumns = [
     { key: 'created_at', label: 'Date And Time', width: '140px' },
     { key: 'updated_at', label: 'Updated', width: '140px' },
 ];
+
+const APPLIED_FILTERS_KEY = 'hd_inventory_applied_filters';
+const FILTER_FORM_KEY = 'hd_inventory_filters';
+
+const loadAppliedFilters = () => {
+    try {
+        const raw = sessionStorage.getItem(APPLIED_FILTERS_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        return null;
+    }
+};
+
+// Backward compatibility: read filters from a legacy URL (?shape=...)
+const parseLegacyFilters = (searchParams) => {
+    const initialFilters = {};
+
+    ['shape', 'color', 'clarity', 'cut', 'polish', 'symmetry',
+        'fluorescenceIntensity', 'fluorescenceColor', 'lab', 'location', 'status',
+        'heartAndArrow', 'shade', 'milky', 'blackInclusion', 'whiteInclusion',
+        'symbols'].forEach((key) => {
+        const value = searchParams.get(key);
+        if (value) {
+            const values = value.split(',').map((v) => v.trim()).filter(Boolean);
+            if (values.length) initialFilters[key] = values;
+        }
+    });
+
+    ['weightMin', 'weightMax', 'pricePerCtMin', 'pricePerCtMax',
+        'totalPriceMin', 'totalPriceMax',
+        'depthMin', 'depthMax', 'tableMin', 'tableMax', 'ratioMin', 'ratioMax',
+        'lengthMin', 'lengthMax', 'widthMin', 'widthMax', 'heightMin', 'heightMax',
+        'crownAngleMin', 'crownAngleMax', 'crownHeightMin', 'crownHeightMax',
+        'pavilionAngleMin', 'pavilionAngleMax', 'pavilionDepthMin', 'pavilionDepthMax',
+        'keyToSymbole', 'symbolMode',
+        'noBgm', 'noBlack',
+        'availableOnly', 'newOnly', 'offerOnly', 'upcomingOnly',
+        'search'].forEach((key) => {
+        const value = searchParams.get(key);
+        if (value) initialFilters[key] = value;
+    });
+
+    return initialFilters;
+};
+
 const Inventory = () => {
     const { showToast } = useToast();
+    const location = useLocation();
+    const navigate = useNavigate();
 
     // Table data and pagination state
     const [diamonds, setDiamonds] = useState([]);
@@ -364,24 +412,23 @@ const Inventory = () => {
     const [perPage, setPerPage] = useState(25);
     const [total, setTotal] = useState(0);
 
-    // Search and filter state
+    // Search input stays empty; filters arrive via navigation state / sessionStorage
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-    const [filters, setFilters] = useState({
-        shape: '',
-        color: '',
-        clarity: '',
-        cut: '',
-        lab: '',
-        status: '',
-    });
-    const [filterOptions, setFilterOptions] = useState({
-        shapes: [],
-        colors: [],
-        clarities: [],
-        cuts: [],
-        labs: [],
-        statuses: [],
+    const [filters, setFilters] = useState(() => {
+        // 1) Filters passed with navigate('/inventory', { state: { appliedFilters } })
+        if (location.state?.appliedFilters && typeof location.state.appliedFilters === 'object') {
+            return location.state.appliedFilters;
+        }
+
+        // 2) Filters kept for this tab (survives refresh)
+        const stored = loadAppliedFilters();
+        if (stored && typeof stored === 'object') {
+            return stored;
+        }
+
+        // 3) Legacy URL query params
+        return parseLegacyFilters(new URLSearchParams(location.search || ''));
     });
 
     // Sorting state
@@ -396,12 +443,6 @@ const Inventory = () => {
 
     // Media preview modal
     const [mediaPreview, setMediaPreview] = useState(null);
-
-    // DNA details modal
-    const [dnaModal, setDnaModal] = useState(null);
-    const openDnaModal = (stockNo, value) => {
-        setDnaModal({ stockNo, value });
-    };
 
     // Delete confirmation
     const [deleteConfirm, setDeleteConfirm] = useState({
@@ -468,12 +509,16 @@ const Inventory = () => {
                 params.search = debouncedSearchTerm;
             }
 
-            // Custom filters (shape, color, clarity, cut, lab, status)
+            // Custom filters (multi-value arrays and single-value ranges/flags)
             Object.entries(filters).forEach(([key, value]) => {
-                if (value) params[key] = value;
+                if (Array.isArray(value)) {
+                    if (value.length) params[key] = value;
+                } else if (value !== '' && value !== null && value !== undefined) {
+                    params[key] = value;
+                }
             });
 
-            const response = await diamondApi.list(params, { signal: controller.signal });
+            const response = await diamondApi.search(params, { signal: controller.signal });
 
             // Extract the payload (handles direct Yajra response or wrapped { success: true, data: { ... } })
             let payload = response;
@@ -525,18 +570,6 @@ const Inventory = () => {
             setTotal(totalRecords);
             setLastPage(activeLastPage);
             setCurrentPage(activeCurrentPage);
-
-            // Extract filter options from the returned data (merge with existing)
-            if (Array.isArray(items) && items.length > 0) {
-                setFilterOptions(prev => ({
-                    shapes: prev.shapes.length ? prev.shapes : [...new Set(items.map(d => d.shape).filter(Boolean))].sort(),
-                    colors: prev.colors.length ? prev.colors : [...new Set(items.map(d => d.color).filter(Boolean))].sort(),
-                    clarities: prev.clarities.length ? prev.clarities : [...new Set(items.map(d => d.clarity).filter(Boolean))].sort(),
-                    cuts: prev.cuts.length ? prev.cuts : [...new Set(items.map(d => d.cut).filter(Boolean))].sort(),
-                    labs: prev.labs.length ? prev.labs : [...new Set(items.map(d => d.lab).filter(Boolean))].sort(),
-                    statuses: prev.statuses.length ? prev.statuses : [...new Set(items.map(d => d.status).filter(Boolean))].sort(),
-                }));
-            }
         } catch (err) {
             // Ignore canceled requests
             if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
@@ -598,8 +631,21 @@ const Inventory = () => {
 
     // Clear all filters and reset to page 1
     const clearFilters = () => {
-        setFilters({ shape: '', color: '', clarity: '', cut: '', lab: '', status: '' });
+        setFilters({});
+        setSearchTerm('');
+        setDebouncedSearchTerm('');
         setCurrentPage(1);
+        // Forget the selection kept for the filter page, otherwise
+        // "Back to Filters" would bring back the cleared filters
+        sessionStorage.removeItem(FILTER_FORM_KEY);
+        sessionStorage.removeItem(APPLIED_FILTERS_KEY);
+        // Remove the navigation state too, so a refresh does not restore them
+        navigate('/inventory', { replace: true, state: {} });
+    };
+
+    // Navigate back to filter page; the form is restored from sessionStorage
+    const goBackToFilters = () => {
+        navigate('/inventory/filter');
     };
 
     // Media preview
@@ -799,75 +845,34 @@ const Inventory = () => {
                         {value}
                     </span>
                 );
-            case 'DNA': {
-                const strVal = String(value).trim();
-                const isUrl = /^https?:\/\//i.test(strVal) || strVal.startsWith('www.');
-                if (isUrl) {
-                    const href = strVal.startsWith('http') ? strVal : `https://${strVal}`;
-                    return (
-                        <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                padding: '3px 9px',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                color: '#0d6efd',
-                                backgroundColor: '#e7f1ff',
-                                border: '1px solid #b6d4fe',
-                                borderRadius: '4px',
-                                textDecoration: 'none',
-                                whiteSpace: 'nowrap'
-                            }}
-                            title={`Open DNA Link: ${strVal}`}
-                        >
-                            <ExternalLink size={12} />
-                            <span>View DNA</span>
-                        </a>
-                    );
-                }
+            case 'DNA':
                 return (
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', maxWidth: '100%' }}>
-                        <span
-                            title={strVal}
-                            style={{
-                                fontFamily: 'monospace',
-                                fontSize: '11px',
-                                wordBreak: 'break-all',
-                                maxWidth: '180px',
-                                lineHeight: '1.3'
-                            }}
-                        >
-                            {strVal}
-                        </span>
-                        <button
-                            type="button"
-                            className="action-btn"
-                            onClick={() => openDnaModal(diamond.stockNo, strVal)}
-                            title="View Full DNA"
-                            style={{ padding: '2px 4px', height: 'auto', minWidth: 'auto', color: '#0d6efd' }}
-                        >
-                            <Eye size={13} />
-                        </button>
-                        <button
-                            type="button"
-                            className="action-btn"
-                            onClick={() => {
-                                navigator.clipboard?.writeText(strVal);
-                                showToast('DNA copied to clipboard!', 'success');
-                            }}
-                            title="Copy DNA"
-                            style={{ padding: '2px 4px', height: 'auto', minWidth: 'auto', color: '#6c757d' }}
-                        >
-                            <Copy size={13} />
-                        </button>
-                    </div>
+                    <a
+                        href={`/inventory/dna/${diamond.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '3px 9px',
+                            fontFamily: 'inherit',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: '#0d6efd',
+                            backgroundColor: '#e7f1ff',
+                            border: '1px solid #b6d4fe',
+                            borderRadius: '4px',
+                            textDecoration: 'none',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                        }}
+                        title="View Full DNA in a new tab"
+                    >
+                        <ExternalLink size={12} />
+                        <span>View DNA</span>
+                    </a>
                 );
-            }
             default:
                 return <span title={String(value)}>{String(value).length > 35 ? String(value).substring(0, 35) + '...' : String(value)}</span>;
         }
@@ -907,41 +912,40 @@ const Inventory = () => {
                         type="text"
                         placeholder="Search by Stock No or Report No..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            // Typing overrides the stock-id filter coming from the filter page
+                            if (filters.search !== undefined) {
+                                setFilters((prev) => {
+                                    const next = { ...prev };
+                                    delete next.search;
+                                    return next;
+                                });
+                            }
+                        }}
                         className="search-input"
                         disabled={loading}
                     />
                 </div>
                 <div className="filters-wrapper">
-                    {[
-                        { key: 'shape', label: 'Shape', options: filterOptions.shapes },
-                        { key: 'color', label: 'Color', options: filterOptions.colors },
-                        { key: 'clarity', label: 'Clarity', options: filterOptions.clarities },
-                        { key: 'cut', label: 'Cut', options: filterOptions.cuts },
-                        { key: 'lab', label: 'Lab', options: filterOptions.labs },
-                        { key: 'status', label: 'Status', options: filterOptions.statuses },
-                    ].map(({ key, label, options }) => (
-                        <select
-                            key={key}
-                            value={filters[key]}
-                            onChange={(e) => setFilters(prev => ({ ...prev, [key]: e.target.value }))}
-                            className="filter-select"
-                            disabled={loading}
-                        >
-                            <option value="">All {label}</option>
-                            {options.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    ))}
                     <button
-                        className="filter-clear-btn"
-                        onClick={clearFilters}
-                        disabled={loading || !Object.values(filters).some(v => v)}
+                        className="filter-clear-btn back-to-filters"
+                        onClick={goBackToFilters}
+                        disabled={loading}
                     >
-                        <X size={14} style={{ marginRight: '4px' }} />
-                        Clear
+                        <ArrowLeft size={14} style={{ marginRight: '4px' }} />
+                        Back to Filters
                     </button>
+                    {Object.keys(filters).length > 0 && (
+                        <button
+                            className="filter-clear-btn"
+                            onClick={clearFilters}
+                            disabled={loading || !Object.values(filters).some(v => v)}
+                        >
+                            <X size={14} style={{ marginRight: '4px' }} />
+                            Clear Filters
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -1056,73 +1060,6 @@ const Inventory = () => {
                 onSelectNone={() => setVisibleColumns(['stockNo', 'status'])}
             />
 
-            {/* DNA Details Modal */}
-            {dnaModal && (
-                <div className="modal-overlay" onClick={() => setDnaModal(null)}>
-                    <div className="modal-container" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2 className="modal-title">DNA Details &mdash; {dnaModal.stockNo}</h2>
-                            <button className="modal-close" onClick={() => setDnaModal(null)}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <div style={{ marginBottom: '12px', fontSize: '13px', color: 'var(--color-text-light)' }}>
-                                Full DNA Information for Stock No: <strong>{dnaModal.stockNo}</strong>
-                            </div>
-                            <div style={{
-                                padding: '14px',
-                                backgroundColor: 'var(--color-input-bg, #f8f9fa)',
-                                border: '1px solid var(--color-input-border, #dee2e6)',
-                                borderRadius: '6px',
-                                fontFamily: 'monospace',
-                                fontSize: '12px',
-                                wordBreak: 'break-all',
-                                maxHeight: '240px',
-                                overflowY: 'auto',
-                                lineHeight: '1.6',
-                                color: 'var(--color-text-dark, #212529)'
-                            }}>
-                                {dnaModal.value}
-                            </div>
-                        </div>
-                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                            {/^https?:\/\//i.test(dnaModal.value) || dnaModal.value.startsWith('www.') ? (
-                                <a
-                                    href={dnaModal.value.startsWith('http') ? dnaModal.value : `https://${dnaModal.value}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="submit-button secondary"
-                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                >
-                                    <ExternalLink size={14} />
-                                    Open Link
-                                </a>
-                            ) : null}
-                            <button
-                                type="button"
-                                className="submit-button"
-                                onClick={() => {
-                                    navigator.clipboard?.writeText(dnaModal.value);
-                                    showToast('DNA copied to clipboard!', 'success');
-                                }}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                            >
-                                <Copy size={14} />
-                                Copy to Clipboard
-                            </button>
-                            <button
-                                type="button"
-                                className="submit-button secondary"
-                                onClick={() => setDnaModal(null)}
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Delete Confirmation Modal */}
             {deleteConfirm.isOpen && (
                 <div className="modal-overlay" onClick={handleCloseDeleteConfirm}>
@@ -1167,7 +1104,7 @@ const Inventory = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 .spin {
                     animation: spin 1s linear infinite;
                 }
