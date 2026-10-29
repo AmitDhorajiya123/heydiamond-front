@@ -2,147 +2,67 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import Layout from '../components/Layout';
+import { SHAPE_ICONS } from '../components/shapeIcons';
 
 /* ------------------------------------------------------------------ */
-/* Shape icons (simple facet outlines)                                 */
+/* Shape icons (reference diamond-shape glyphs)                        */
 /* ------------------------------------------------------------------ */
 const ShapeIcon = ({ type }) => {
-    const svgProps = {
-        viewBox: '0 0 48 48',
-        fill: 'none',
-        stroke: 'currentColor',
-        strokeWidth: 1.4,
-        strokeLinejoin: 'round',
-        strokeLinecap: 'round',
-        'aria-hidden': true,
-    };
+    const glyph = SHAPE_ICONS[type] || SHAPE_ICONS.Other;
+    if (!glyph) return null;
 
-    switch (type) {
-        case 'Round':
-            return (
-                <svg {...svgProps}>
-                    <circle cx="24" cy="24" r="16" />
-                    <polygon points="24,12 33,17 35,26 30,34 24,36 18,34 13,26 15,17" />
-                    <line x1="24" y1="8" x2="24" y2="12" />
-                    <line x1="16" y1="9.5" x2="18" y2="14" />
-                    <line x1="32" y1="9.5" x2="30" y2="14" />
-                    <line x1="39" y1="17" x2="34.5" y2="19.5" />
-                    <line x1="39" y1="31" x2="34" y2="28.5" />
-                    <line x1="24" y1="40" x2="24" y2="36" />
-                </svg>
-            );
-        case 'Emerald':
-            return (
-                <svg {...svgProps}>
-                    <polygon points="9,15 15,9 33,9 39,15 39,33 33,39 15,39 9,33" />
-                    <rect x="16" y="16" width="16" height="16" />
-                    <line x1="9" y1="15" x2="16" y2="16" />
-                    <line x1="39" y1="15" x2="32" y2="16" />
-                    <line x1="9" y1="33" x2="16" y2="32" />
-                    <line x1="39" y1="33" x2="32" y2="32" />
-                </svg>
-            );
-        case 'Sq Emerald':
-            return (
-                <svg {...svgProps}>
-                    <polygon points="12,9 36,9 39,12 39,36 36,39 12,39 9,36 9,12" />
-                    <rect x="17" y="17" width="14" height="14" />
-                    <line x1="12" y1="9" x2="17" y2="17" />
-                    <line x1="36" y1="9" x2="31" y2="17" />
-                    <line x1="12" y1="39" x2="17" y2="31" />
-                    <line x1="36" y1="39" x2="31" y2="31" />
-                </svg>
-            );
-        case 'Radiant':
-            return (
-                <svg {...svgProps}>
-                    <polygon points="10,14 15,9 33,9 38,14 38,34 33,39 15,39 10,34" />
-                    <rect x="17" y="16" width="14" height="16" />
-                    <line x1="10" y1="14" x2="17" y2="16" />
-                    <line x1="38" y1="14" x2="31" y2="16" />
-                    <line x1="10" y1="34" x2="17" y2="32" />
-                    <line x1="38" y1="34" x2="31" y2="32" />
-                </svg>
-            );
-        case 'Princess':
-            return (
-                <svg {...svgProps}>
-                    <rect x="10" y="10" width="28" height="28" />
-                    <line x1="10" y1="10" x2="38" y2="38" />
-                    <line x1="38" y1="10" x2="10" y2="38" />
-                    <rect x="17" y="17" width="14" height="14" />
-                </svg>
-            );
-        case 'Cushion':
-            return (
-                <svg {...svgProps}>
-                    <rect x="10" y="10" width="28" height="28" rx="9" />
-                    <polygon points="24,13 34,17 35,24 34,31 24,35 14,31 13,24 14,17" />
-                </svg>
-            );
-        case 'Baguette':
-            return (
-                <svg {...svgProps}>
-                    <polygon points="17,9 31,9 35,13 35,35 31,39 17,39 13,35 13,13" />
-                    <rect x="20" y="14" width="8" height="20" />
-                    <line x1="13" y1="13" x2="20" y2="14" />
-                    <line x1="35" y1="13" x2="28" y2="14" />
-                    <line x1="13" y1="35" x2="20" y2="34" />
-                    <line x1="35" y1="35" x2="28" y2="34" />
-                </svg>
-            );
-        case 'Pear':
-            return (
-                <svg {...svgProps}>
-                    <path d="M24 6 C 32 15, 37 22, 37 29 A 13 13 0 1 1 11 29 C 11 22, 16 15, 24 6 Z" />
-                    <path d="M24 13 C 29 19, 32 24, 32 29 A 8 8 0 1 1 16 29 C 16 24, 19 19, 24 13 Z" />
-                    <line x1="24" y1="13" x2="24" y2="38" />
-                </svg>
-            );
-        case 'Oval':
-            return (
-                <svg {...svgProps}>
-                    <ellipse cx="24" cy="24" rx="13" ry="17" />
-                    <polygon points="24,10 31,16 31,32 24,38 17,32 17,16" />
-                    <line x1="24" y1="7" x2="24" y2="10" />
-                    <line x1="24" y1="38" x2="24" y2="41" />
-                </svg>
-            );
-        case 'Heart':
-            return (
-                <svg {...svgProps}>
-                    <path d="M24 40 C 11 31, 7 21, 13 15 C 18 10, 24 15, 24 19 C 24 15, 30 10, 35 15 C 41 21, 37 31, 24 40 Z" />
-                    <path d="M24 33 C 16 27, 15 22, 19 19 C 22 17, 24 20, 24 22 C 24 20, 26 17, 29 19 C 33 22, 32 27, 24 33 Z" />
-                </svg>
-            );
-        case 'Marquise':
-            return (
-                <svg {...svgProps}>
-                    <path d="M24 7 C 31 15, 36 20, 36 24 C 36 28, 31 33, 24 41 C 17 33, 12 28, 12 24 C 12 20, 17 15, 24 7 Z" />
-                    <polygon points="24,13 30,20 30,28 24,35 18,28 18,20" />
-                </svg>
-            );
-        case 'Other':
-        default:
-            return (
-                <svg {...svgProps}>
-                    <polygon points="24,8 38,19 33,39 15,39 10,19" />
-                    <polygon points="24,14 32,21 29,33 19,33 16,21" />
-                    <line x1="24" y1="8" x2="24" y2="14" />
-                    <line x1="10" y1="19" x2="16" y2="21" />
-                    <line x1="38" y1="19" x2="32" y2="21" />
-                </svg>
-            );
-    }
+    return (
+        <svg
+            viewBox={`0 0 ${glyph.width} 1024`}
+            preserveAspectRatio="xMidYMid meet"
+            fill="currentColor"
+            aria-hidden="true"
+        >
+            <g transform="translate(0, 960) scale(1, -1)">
+                <path d={glyph.d} />
+            </g>
+        </svg>
+    );
 };
 
 /* ------------------------------------------------------------------ */
 /* Static filter choices (matching the reference layout)               */
 /* ------------------------------------------------------------------ */
 const SHAPES = [
-    'Round', 'Emerald', 'Sq Emerald', 'Radiant', 'Princess', 'Cushion',
-    'Baguette', 'Pear', 'Oval', 'Heart', 'Marquise', 'Other',
+    { label: 'Round', value: 'Round' },
+    { label: 'Oval', value: 'Oval' },
+    { label: 'Pear', value: 'Pear' },
+    { label: 'Cush Mod', value: 'Cushion' },
+    { label: 'Cush Brill', value: 'Cushion Brilliant' },
+    { label: 'Emerald', value: 'Emerald' },
+    { label: 'Radiant', value: 'Radiant' },
+    { label: 'Princess', value: 'Princess' },
+    { label: 'Asscher', value: 'Asscher' },
+    { label: 'Square', value: 'Square' },
+    { label: 'Marquise', value: 'Marquise' },
+    { label: 'Heart', value: 'Heart' },
+    { label: 'Trilliant', value: 'Trilliant' },
+    { label: 'Euro Cut', value: 'Euro Cut' },
+    { label: 'Old Miner', value: 'Old Miner' },
+    { label: 'Briolette', value: 'Briolette' },
+    { label: 'Rose Cut', value: 'Rose Cut' },
+    { label: 'Lozenge', value: 'Lozenge' },
+    { label: 'Baguette', value: 'Baguette' },
+    { label: 'Tap Bag', value: 'Tapered Baguette' },
+    { label: 'Half Moon', value: 'Half Moon' },
+    { label: 'Flanders', value: 'Flanders' },
+    { label: 'Trapezoid', value: 'Trapezoid' },
+    { label: 'Bullets', value: 'Bullets' },
+    { label: 'Kite', value: 'Kite' },
+    { label: 'Shield', value: 'Shield' },
+    { label: 'Star', value: 'Star' },
+    { label: 'Pentagonal', value: 'Pentagonal' },
+    { label: 'Hexagonal', value: 'Hexagonal' },
+    { label: 'Octagonal', value: 'Octagonal' },
+    { label: 'Other', value: 'Other' },
 ];
+
+const SHAPE_VALUES = SHAPES.map((shape) => shape.value);
 
 const COLORS = [
     'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
@@ -317,7 +237,7 @@ const parseFiltersFromParams = (params) => {
 
     const filters = {
         ...emptyFilters,
-        shapes: knownOnly(commaList(params, 'shape'), SHAPES),
+        shapes: knownOnly(commaList(params, 'shape'), SHAPE_VALUES),
         colors: knownOnly(commaList(params, 'color'), COLORS),
         clarities: knownOnly(commaList(params, 'clarity'), CLARITIES),
         sizes: sizeState.sizes,
@@ -374,7 +294,11 @@ const InventoryFilter = () => {
     /* Prefer the selection saved when Search was pressed, otherwise rebuild from the URL */
     const initialState = useMemo(() => loadSavedFilters() || parseFiltersFromParams(searchParams), []);
 
-    const [filters, setFilters] = useState(() => ({ ...emptyFilters, ...(initialState.filters || {}) }));
+    const [filters, setFilters] = useState(() => {
+        const next = { ...emptyFilters, ...(initialState.filters || {}) };
+        next.shapes = knownOnly(next.shapes || [], SHAPE_VALUES);
+        return next;
+    });
     const [stockId, setStockId] = useState(() => initialState.stockId || '');
     const [flags, setFlags] = useState(() => ({
         available: false,
@@ -652,17 +576,20 @@ const InventoryFilter = () => {
                             <span className="invfilter-label">Shape</span>
                         </div>
                         <div className="invfilter-content">
-                            {SHAPES.map((shape) => (
-                                <button
-                                    type="button"
-                                    key={shape}
-                                    className={`invfilter-shape-tile ${filters.shapes.includes(shape) ? 'active' : ''}`}
-                                    onClick={() => toggle('shapes', shape)}
-                                >
-                                    <ShapeIcon type={shape} />
-                                    <span>{shape}</span>
-                                </button>
-                            ))}
+                            <div className="invfilter-shape-grid">
+                                {SHAPES.map(({ label, value }) => (
+                                    <button
+                                        type="button"
+                                        key={value}
+                                        className={`invfilter-shape-tile ${filters.shapes.includes(value) ? 'active' : ''}`}
+                                        onClick={() => toggle('shapes', value)}
+                                        title={label}
+                                    >
+                                        <ShapeIcon type={label} />
+                                        <span>{label}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -1236,31 +1163,47 @@ const InventoryFilter = () => {
                 }
 
                 /* ---------- shape tiles ---------- */
+                .invfilter-shape-grid {
+                    width: 100%;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+                    gap: 10px;
+                }
+
                 .invfilter-shape-tile {
-                    width: 84px;
-                    height: 72px;
-                    display: inline-flex;
+                    width: 100%;
+                    min-height: 96px;
+                    padding: 8px 4px 6px;
+                    display: flex;
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    gap: 4px;
-                    border: 1px solid #dcd5cc;
-                    border-radius: 4px;
-                    background: #fff;
+                    gap: 6px;
+                    border: 1px solid transparent;
+                    border-radius: 8px;
+                    background: #f2f0ed;
                     color: #4a443e;
                     font-family: inherit;
                     font-size: 12.5px;
+                    line-height: 1.15;
                     cursor: pointer;
                     transition: background 0.15s, color 0.15s, border-color 0.15s;
                 }
 
                 .invfilter-shape-tile svg {
-                    width: 32px;
-                    height: 32px;
+                    width: 54px;
+                    height: 54px;
+                    flex: none;
+                }
+
+                .invfilter-shape-tile span {
+                    text-align: center;
+                    white-space: nowrap;
                 }
 
                 .invfilter-shape-tile:hover {
-                    border-color: var(--color-primary);
+                    background: #e9e4dd;
+                    border-color: #d8cfc4;
                     color: var(--color-primary);
                 }
 
@@ -1268,6 +1211,11 @@ const InventoryFilter = () => {
                     background: var(--color-primary);
                     border-color: var(--color-primary);
                     color: #fff;
+                }
+
+                .invfilter-shape-tile:focus-visible {
+                    outline: 2px solid var(--color-primary);
+                    outline-offset: 2px;
                 }
 
                 /* ---------- inputs ---------- */
@@ -1507,6 +1455,10 @@ const InventoryFilter = () => {
                         padding-top: 0;
                     }
 
+                    .invfilter-content {
+                        width: 100%;
+                    }
+
                     .invfilter-text {
                         width: 100%;
                     }
@@ -1536,6 +1488,21 @@ const InventoryFilter = () => {
                 @media (max-width: 576px) {
                     .invfilter-topbar {
                         padding: 10px 0;
+                    }
+
+                    .invfilter-shape-grid {
+                        grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+                        gap: 8px;
+                    }
+
+                    .invfilter-shape-tile {
+                        min-height: 88px;
+                        font-size: 12px;
+                    }
+
+                    .invfilter-shape-tile svg {
+                        width: 48px;
+                        height: 48px;
                     }
 
                     .invfilter-symbol-modes {

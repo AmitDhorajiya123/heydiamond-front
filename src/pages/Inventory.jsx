@@ -451,12 +451,26 @@ const Inventory = () => {
         loading: false,
     });
 
-    // Debounce search
+    // Debounce search: wait until the user stops typing before querying
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearchTerm(searchTerm);
             setCurrentPage(1);
-        }, 300);
+
+            // Typing overrides the Stock ID filter from the filter page.
+            // Clear it in the same batch as the debounced search so the first
+            // keystroke does not trigger an extra immediate request.
+            if (searchTerm.trim() !== '') {
+                setFilters((prev) => {
+                    if (!Object.prototype.hasOwnProperty.call(prev, 'search')) {
+                        return prev;
+                    }
+                    const next = { ...prev };
+                    delete next.search;
+                    return next;
+                });
+            }
+        }, 700);
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
@@ -503,18 +517,22 @@ const Inventory = () => {
                 params[`columns[${sortColumnIndex}][name]`] = sortBy;
             }
 
-            // Search query for both Yajra (search[value]) and standard (search)
+            // Search query (standard Laravel + Yajra compatible)
             if (debouncedSearchTerm) {
-                params['search[value]'] = debouncedSearchTerm;
                 params.search = debouncedSearchTerm;
             }
 
             // Custom filters (multi-value arrays and single-value ranges/flags)
             Object.entries(filters).forEach(([key, value]) => {
+                // The filter page's "Stock ID / Certificate #" filter must stay
+                // limited to stockNo/reportNo, so it cannot reuse the global
+                // datatable `search` parameter.
+                const paramKey = key === 'search' ? 'stockSearch' : key;
+
                 if (Array.isArray(value)) {
-                    if (value.length) params[key] = value;
+                    if (value.length) params[paramKey] = value;
                 } else if (value !== '' && value !== null && value !== undefined) {
-                    params[key] = value;
+                    params[paramKey] = value;
                 }
             });
 
@@ -851,22 +869,7 @@ const Inventory = () => {
                         href={`/inventory/dna/${diamond.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '3px 9px',
-                            fontFamily: 'inherit',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            color: '#0d6efd',
-                            backgroundColor: '#e7f1ff',
-                            border: '1px solid #b6d4fe',
-                            borderRadius: '4px',
-                            textDecoration: 'none',
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap'
-                        }}
+                        className="dna-view-link"
                         title="View Full DNA in a new tab"
                     >
                         <ExternalLink size={12} />
@@ -905,28 +908,39 @@ const Inventory = () => {
             </div>
 
             {/* Search and Filters Bar */}
-            <div className="filters-bar">
-                <div className="search-wrapper">
-                    <Search size={18} className="search-icon" />
-                    <input
-                        type="text"
-                        placeholder="Search by Stock No or Report No..."
-                        value={searchTerm}
-                        onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            // Typing overrides the stock-id filter coming from the filter page
-                            if (filters.search !== undefined) {
-                                setFilters((prev) => {
-                                    const next = { ...prev };
-                                    delete next.search;
-                                    return next;
-                                });
-                            }
-                        }}
-                        className="search-input"
-                        disabled={loading}
-                    />
+            <div className="filters-bar inventory-toolbar">
+                <div className="inventory-toolbar-left">
+                    <div className="search-wrapper">
+                        <Search size={18} className="search-icon" />
+                        <input
+                            type="text"
+                            placeholder="Search all columns..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="search-input"
+                        />
+                    </div>
+
+                    <div className="inventory-per-page">
+                        <span>Show</span>
+                        <select
+                            value={perPage}
+                            onChange={(e) => {
+                                setPerPage(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="inventory-per-page-select"
+                            disabled={loading}
+                            aria-label="Select number of entries per page"
+                        >
+                            {[10, 25, 50, 100, 200].map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                            ))}
+                        </select>
+                        <span>entries</span>
+                    </div>
                 </div>
+
                 <div className="filters-wrapper">
                     <button
                         className="filter-clear-btn back-to-filters"
@@ -1034,7 +1048,7 @@ const Inventory = () => {
                         setCurrentPage(1);
                     }}
                     loading={loading}
-                    showPerPage={true}
+                    showPerPage={false}
                     showInfo={true}
                     showQuickJump={true}
                 />
