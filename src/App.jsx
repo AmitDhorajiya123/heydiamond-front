@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import InventoryFilter from './pages/InventoryFilter';
 import DiamondDNA from './pages/DiamondDNA';
+import ApiClient from './pages/ApiClient';
 
 function App() {
   return (
@@ -40,6 +41,11 @@ function App() {
               {/* Our own Diamond DNA / stone details page */}
               <Route path="/inventory/dna/:id" element={
                 <ProtectedRoute adminOnly><DiamondDNA /></ProtectedRoute>
+              } />
+
+              {/* API / FTP Client - custom API data listing */}
+              <Route path="/api-client" element={
+                <ProtectedRoute adminOnly><ApiClient /></ProtectedRoute>
               } />
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

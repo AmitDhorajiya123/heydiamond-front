@@ -13,7 +13,8 @@ import {
     Package,
     Search,
     Gem,
-    RefreshCw
+    RefreshCw,
+    Globe
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -74,6 +75,12 @@ const Layout = ({ children }) => {
                         <Link to="/inventory/filter" className={`nav-item ${isActive('/inventory') || isActive('/inventory/filter') || location.pathname.startsWith('/inventory/dna') ? 'active' : ''}`} title="Inventory">
                             <Gem size={20} />
                             <span>Inventory</span>
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link to="/api-client" className={`nav-item ${isActive('/api-client') ? 'active' : ''}`} title="API / FTP Client">
+                            <Globe size={20} />
+                            <span>API / FTP Client</span>
                         </Link>
                     )}
                 </nav>

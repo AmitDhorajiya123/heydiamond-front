@@ -44,8 +44,26 @@ export const diamondApi = {
     },
 
     // Sync diamonds from external API
-    sync: async () => {
-        const response = await api.post('/diamonds/sync');
+    sync: async (data = {}, options = {}) => {
+        const response = await api.post('/diamonds/sync', data, options);
+        return response.data;
+    },
+
+    // List all configured external API clients (DB driven source list)
+    apiClients: async () => {
+        const response = await api.get('/diamonds/api-clients');
+        return response.data;
+    },
+
+    // Create a new external API client
+    createApiClient: async (data = {}) => {
+        const response = await api.post('/diamonds/api-clients', data);
+        return response.data;
+    },
+
+    // Remove an external API client
+    deleteApiClient: async (id) => {
+        const response = await api.delete(`/diamonds/api-clients/${id}`);
         return response.data;
     },
 };

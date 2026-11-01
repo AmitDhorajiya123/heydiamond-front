@@ -455,6 +455,9 @@ const Inventory = () => {
     const [lastPage, setLastPage] = useState(1);
     const [perPage, setPerPage] = useState(25);
     const [total, setTotal] = useState(0);
+    const [apiClients, setApiClients] = useState([]);
+    const [apiLoading, setApiLoading] = useState(false);
+    const [apiFilterId, setApiFilterId] = useState('');
 
     // Search input stays empty; filters arrive via navigation state / sessionStorage
     const [searchTerm, setSearchTerm] = useState('');
@@ -518,8 +521,44 @@ const Inventory = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
+    // Load external API clients from the backend DB (api_clients table)
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadApiClients = async () => {
+            setApiLoading(true);
+            try {
+                const response = await diamondApi.apiClients();
+                let payload = response;
+                if (response?.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+                    payload = response.data;
+                }
+                const list = Array.isArray(payload)
+                    ? payload
+                    : (Array.isArray(payload?.data) ? payload.data : []);
+                if (!cancelled) setApiClients(list);
+            } catch (err) {
+                console.error('Failed to load API clients:', err);
+                if (!cancelled) setApiClients([]);
+            } finally {
+                if (!cancelled) setApiLoading(false);
+            }
+        };
+
+        loadApiClients();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const abortControllerRef = useRef(null);
     const drawCounterRef = useRef(1);
+    const fetchDiamondsRef = useRef(null);
+
+    useEffect(() => {
+        fetchDiamondsRef.current = fetchDiamonds;
+    });
 
     // Fetch diamonds
     const fetchDiamonds = useCallback(async () => {
@@ -657,10 +696,14 @@ const Inventory = () => {
     const handleSync = async () => {
         setSyncing(true);
         try {
-            const response = await diamondApi.sync();
+            // If a specific API is selected in the dropdown, sync that one; otherwise sync all
+            const payload = apiFilterId ? { api_client_id: apiFilterId } : {};
+            const response = await diamondApi.sync(payload);
             if (response.success) {
                 showToast(response.message || 'Diamonds synced successfully!', 'success');
-                fetchDiamonds();
+                if (fetchDiamondsRef.current) {
+                    await fetchDiamondsRef.current();
+                }
             } else {
                 showToast(response.message || 'Sync failed', 'error');
             }
@@ -669,6 +712,25 @@ const Inventory = () => {
             showToast(err.response?.data?.message || 'Sync failed', 'error');
         } finally {
             setSyncing(false);
+        }
+    };
+
+    // Filter table data by selected API source when "Done" is clicked
+    const handleApiDone = () => {
+        setCurrentPage(1);
+        if (!apiFilterId) {
+            // "All APIs" selected -> remove api_client_id filter
+            setFilters((prev) => {
+                const next = { ...prev };
+                delete next.api_client_id;
+                return next;
+            });
+        } else {
+            // Specific API selected -> filter table by this api_client_id
+            setFilters((prev) => ({
+                ...prev,
+                api_client_id: apiFilterId
+            }));
         }
     };
 
@@ -963,6 +1025,28 @@ const Inventory = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="search-input"
                         />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <select
+                            className="inventory-api-select"
+                            value={apiFilterId}
+                            onChange={(e) => setApiFilterId(e.target.value)}
+                            disabled={loading || apiLoading}
+                            aria-label="Select API source"
+                        >
+                            <option value="">All APIs</option>
+                            {apiClients.map((client) => (
+                                <option key={client.id} value={client.id}>{client.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            className="submit-button secondary"
+                            onClick={handleApiDone}
+                            disabled={loading}
+                        >
+                            Done
+                        </button>
                     </div>
 
                     <div className="inventory-per-page">
