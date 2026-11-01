@@ -13,6 +13,12 @@ export const diamondApi = {
         return response.data;
     },
 
+    // Distinct country / state / city values for the filter page
+    locationOptions: async () => {
+        const response = await api.get('/diamonds/location-options');
+        return response.data;
+    },
+
     // Get single diamond by ID
     get: async (id) => {
         const response = await api.get(`/diamonds/${id}`);

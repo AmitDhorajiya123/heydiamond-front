@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import Layout from '../components/Layout';
 import { SHAPE_ICONS } from '../components/shapeIcons';
+import { diamondApi } from '../apis/diamond';
 
 /* ------------------------------------------------------------------ */
 /* Shape icons (reference diamond-shape glyphs)                        */
@@ -59,16 +60,47 @@ const SHAPES = [
     { label: 'Pentagonal', value: 'Pentagonal' },
     { label: 'Hexagonal', value: 'Hexagonal' },
     { label: 'Octagonal', value: 'Octagonal' },
-    { label: 'Other', value: 'Other' },
+    // { label: 'Other', value: 'Other' },
 ];
 
 const SHAPE_VALUES = SHAPES.map((shape) => shape.value);
 
-const COLORS = [
+const WHITE_COLORS = [
     'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
-    'X', 'Y', 'FANCY',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W-Z',
 ];
+
+const FANCY_COLORS = [
+    'YELLOW', 'ORANGE', 'PINK', 'BLUE', 'GREEN', 'CHAMPAGNE', 'BROWN',
+    'RED', 'WHITE', 'VIOLET', 'PURPLE', 'GRAY', 'OLIVE', 'BLACK',
+    'ORANGY YELLOW', 'ORANGE BROWN', 'PINK BROWN', 'GREEN YELLOW',
+    'BROWN YELLOW', 'COGNAC', 'CHAMELEON', 'OTHER',
+];
+
+const FANCY_COLOR_INTENSITIES = [
+    'Fancy Deep',
+    'Fancy Dark',
+    'Fancy Vivid',
+    'Fancy Intense',
+    'Fancy',
+    'Very Light',
+    'Fancy Light',
+    'Light',
+    'Faint',
+];
+
+const normalizeWhiteColor = (value) => (
+    ['W', 'X', 'Y', 'Z'].includes(value) ? 'W-Z' : value
+);
+
+const inferColorMode = (mode, colors) => {
+    if (mode === 'white' || mode === 'fancy') return mode;
+
+    const list = Array.isArray(colors) ? colors : [];
+    return list.includes('FANCY') || list.some((color) => FANCY_COLORS.includes(color))
+        ? 'fancy'
+        : 'white';
+};
 
 const CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2', 'I3'];
 
@@ -76,9 +108,13 @@ const FINISH_GRADES = ['EX', 'VG', 'GD'];
 
 const FLUORESCENCE = ['NONE', 'FAINT', 'MEDIUM', 'STRONG', 'V.STRONG'];
 
-const GRADING_REPORTS = ['IGI', 'RK', 'GIA', 'HRD', 'Other'];
+const LAB_OPTIONS = ['IGI', 'GIA', 'GCAL', 'SGL', 'Other', 'None'];
 
-const LOCATIONS = ['INDIA', 'HK', 'BELGIUM', 'USA', 'DUBAI', 'Other'];
+const DEFAULT_LOCATION_OPTIONS = {
+    countries: ['INDIA'],
+    states: ['Gujarat'],
+    cities: ['Surat'],
+};
 
 const SIZE_OPTIONS = [
     { label: '30s', min: 0.30, max: 0.39 },
@@ -106,7 +142,10 @@ const emptyFilters = {
     symmetry: [],
     fluorescence: [],
     labs: [],
-    locations: [],
+    fancyColorIntensity: [],
+    country: '',
+    state: '',
+    city: '',
 };
 
 const emptyAdvance = {
@@ -235,17 +274,26 @@ const parseFiltersFromParams = (params) => {
     const weightMax = params.get('weightMax') || '';
     const sizeState = restoreSizes(weightMin, weightMax);
 
+    const rawColors = commaList(params, 'color');
+    const colorMode = inferColorMode(params.get('colorMode'), rawColors);
+    const colorValues = colorMode === 'fancy'
+        ? knownOnly(rawColors, FANCY_COLORS)
+        : knownOnly(rawColors.map(normalizeWhiteColor), WHITE_COLORS);
+
     const filters = {
         ...emptyFilters,
         shapes: knownOnly(commaList(params, 'shape'), SHAPE_VALUES),
-        colors: knownOnly(commaList(params, 'color'), COLORS),
+        colors: colorValues,
         clarities: knownOnly(commaList(params, 'clarity'), CLARITIES),
         sizes: sizeState.sizes,
         polish: knownOnly(commaList(params, 'polish'), FINISH_GRADES),
         symmetry: knownOnly(commaList(params, 'symmetry'), FINISH_GRADES),
         fluorescence: knownOnly(commaList(params, 'fluorescenceIntensity'), FLUORESCENCE),
-        labs: knownOnly(commaList(params, 'lab'), GRADING_REPORTS),
-        locations: knownOnly(commaList(params, 'location'), LOCATIONS),
+        labs: knownOnly(commaList(params, 'lab'), LAB_OPTIONS),
+        fancyColorIntensity: knownOnly(commaList(params, 'fancyColorIntensity'), FANCY_COLOR_INTENSITIES),
+        country: params.get('country') || '',
+        state: params.get('state') || '',
+        city: params.get('city') || '',
     };
 
     const adv = { ...emptyAdvance };
@@ -267,6 +315,7 @@ const parseFiltersFromParams = (params) => {
 
     return {
         filters,
+        colorMode,
         stockId: params.get('search') || '',
         flags: {
             available: params.get('availableOnly') === '1',
@@ -292,13 +341,33 @@ const InventoryFilter = () => {
     const [searchParams] = useSearchParams();
 
     /* Prefer the selection saved when Search was pressed, otherwise rebuild from the URL */
-    const initialState = useMemo(() => loadSavedFilters() || parseFiltersFromParams(searchParams), []);
+    const initialState = useMemo(() => {
+        const saved = loadSavedFilters() || parseFiltersFromParams(searchParams);
+        const rawColors = Array.isArray(saved?.filters?.colors) ? saved.filters.colors : [];
+        const colorMode = inferColorMode(saved?.colorMode, rawColors);
+        const colors = colorMode === 'fancy'
+            ? knownOnly(rawColors, FANCY_COLORS)
+            : knownOnly(rawColors.map(normalizeWhiteColor), WHITE_COLORS);
+
+        return {
+            ...saved,
+            colorMode,
+            filters: { ...(saved?.filters || {}), colors },
+        };
+    }, []);
 
     const [filters, setFilters] = useState(() => {
         const next = { ...emptyFilters, ...(initialState.filters || {}) };
         next.shapes = knownOnly(next.shapes || [], SHAPE_VALUES);
+        next.colors = knownOnly(
+            next.colors || [],
+            initialState.colorMode === 'fancy' ? FANCY_COLORS : WHITE_COLORS
+        );
+        next.labs = knownOnly(next.labs || [], LAB_OPTIONS);
+        next.fancyColorIntensity = knownOnly(next.fancyColorIntensity || [], FANCY_COLOR_INTENSITIES);
         return next;
     });
+    const [colorMode, setColorMode] = useState(() => initialState.colorMode || 'white');
     const [stockId, setStockId] = useState(() => initialState.stockId || '');
     const [flags, setFlags] = useState(() => ({
         available: false,
@@ -317,6 +386,29 @@ const InventoryFilter = () => {
     const [symbolsOpen, setSymbolsOpen] = useState(() => Boolean(initialState.symbolsOpen));
     const [keySymbolMode, setKeySymbolMode] = useState(() => initialState.keySymbolMode || 'contains');
     const [keySymbols, setKeySymbols] = useState(() => initialState.keySymbols || []);
+    const [locationOptions, setLocationOptions] = useState(DEFAULT_LOCATION_OPTIONS);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        diamondApi.locationOptions()
+            .then((response) => {
+                if (cancelled) return;
+                const payload = response?.data ?? response ?? {};
+                setLocationOptions({
+                    countries: Array.isArray(payload.countries) ? payload.countries : [],
+                    states: Array.isArray(payload.states) ? payload.states : [],
+                    cities: Array.isArray(payload.cities) ? payload.cities : [],
+                });
+            })
+            .catch(() => {
+                /* keep the fallback values if the options request fails */
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     /* Toggle a tile inside a group */
     const toggle = (group, value) => {
@@ -328,6 +420,13 @@ const InventoryFilter = () => {
                 [group]: exists ? current.filter((v) => v !== value) : [...current, value],
             };
         });
+    };
+
+    /* Switch between white and fancy color palettes */
+    const changeColorMode = (mode) => {
+        if (mode === colorMode) return;
+        setColorMode(mode);
+        setFilters((prev) => ({ ...prev, colors: [] }));
     };
 
     /* Toggle an advanced tile */
@@ -351,6 +450,7 @@ const InventoryFilter = () => {
 
     const resetAll = () => {
         setFilters(emptyFilters);
+        setColorMode('white');
         setStockId('');
         setFlags({ available: false, newStone: false, offer: false, upcoming: false });
         setNoBgm(false);
@@ -368,13 +468,17 @@ const InventoryFilter = () => {
 
         /* Multi-value groups */
         if (filters.shapes.length) appliedFilters.shape = filters.shapes;
+        appliedFilters.colorMode = colorMode;
         if (filters.colors.length) appliedFilters.color = filters.colors;
         if (filters.clarities.length) appliedFilters.clarity = filters.clarities;
         if (filters.polish.length) appliedFilters.polish = filters.polish;
         if (filters.symmetry.length) appliedFilters.symmetry = filters.symmetry;
         if (filters.fluorescence.length) appliedFilters.fluorescenceIntensity = filters.fluorescence;
         if (filters.labs.length) appliedFilters.lab = filters.labs;
-        if (filters.locations.length) appliedFilters.location = filters.locations;
+        if (filters.fancyColorIntensity.length) appliedFilters.fancyColorIntensity = filters.fancyColorIntensity;
+        if (filters.country) appliedFilters.country = filters.country;
+        if (filters.state) appliedFilters.state = filters.state;
+        if (filters.city) appliedFilters.city = filters.city;
 
         /* Stock id / certificate number */
         if (stockId.trim()) appliedFilters.search = stockId.trim();
@@ -440,6 +544,7 @@ const InventoryFilter = () => {
         try {
             sessionStorage.setItem(SAVED_FILTERS_KEY, JSON.stringify({
                 filters,
+                colorMode,
                 stockId,
                 flags,
                 noBgm,
@@ -694,7 +799,73 @@ const InventoryFilter = () => {
                         <div className="invfilter-label-col">
                             <span className="invfilter-label">Color</span>
                         </div>
-                        <div className="invfilter-content">{renderTiles('colors', COLORS)}</div>
+                        <div className="invfilter-content">
+                            <div className="invfilter-color-panel">
+                                <div className="invfilter-color-modes">
+                                    <label className={`invfilter-color-mode ${colorMode === 'white' ? 'active' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="colorMode"
+                                            value="white"
+                                            checked={colorMode === 'white'}
+                                            onChange={() => changeColorMode('white')}
+                                        />
+                                        <span>White</span>
+                                    </label>
+                                    <label className={`invfilter-color-mode ${colorMode === 'fancy' ? 'active' : ''}`}>
+                                        <input
+                                            type="radio"
+                                            name="colorMode"
+                                            value="fancy"
+                                            checked={colorMode === 'fancy'}
+                                            onChange={() => changeColorMode('fancy')}
+                                        />
+                                        <span>Fancy Color</span>
+                                    </label>
+                                </div>
+
+                                <div className="invfilter-tilegroup">
+                                    <button
+                                        type="button"
+                                        className={`invfilter-tile ${filters.colors.length === 0 ? 'active' : ''}`}
+                                        onClick={() => setFilters((prev) => ({ ...prev, colors: [] }))}
+                                    >
+                                        All
+                                    </button>
+                                    {(colorMode === 'fancy' ? FANCY_COLORS : WHITE_COLORS).map((value) => (
+                                        <button
+                                            type="button"
+                                            key={value}
+                                            className={`invfilter-tile ${filters.colors.includes(value) ? 'active' : ''}`}
+                                            onClick={() => toggle('colors', value)}
+                                        >
+                                            {value}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Fancy color intensity */}
+                    <div className="invfilter-row">
+                        <div className="invfilter-label-col">
+                            <span className="invfilter-label">Fancy Color Intensity</span>
+                        </div>
+                        <div className="invfilter-content">
+                            <div className="invfilter-tilegroup">
+                                {FANCY_COLOR_INTENSITIES.map((value) => (
+                                    <button
+                                        type="button"
+                                        key={value}
+                                        className={`invfilter-tile ${filters.fancyColorIntensity.includes(value) ? 'active' : ''}`}
+                                        onClick={() => toggle('fancyColorIntensity', value)}
+                                    >
+                                        {value}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Clarity */}
@@ -747,15 +918,65 @@ const InventoryFilter = () => {
                         </div>
                     </div>
 
-                    {/* Grading report + location */}
+                    {/* Lab */}
                     <div className="invfilter-row">
                         <div className="invfilter-label-col">
-                            <span className="invfilter-label">Grading Report</span>
+                            <span className="invfilter-label">Lab</span>
                         </div>
                         <div className="invfilter-content">
-                            {renderTiles('labs', GRADING_REPORTS)}
-                            <span className="invfilter-inline-label invfilter-inline-label-location">Location</span>
-                            {renderTiles('locations', LOCATIONS)}
+                            {renderTiles('labs', LAB_OPTIONS)}
+                        </div>
+                    </div>
+
+                    {/* Location: country / state / city */}
+                    <div className="invfilter-row">
+                        <div className="invfilter-label-col">
+                            <span className="invfilter-label">Location</span>
+                        </div>
+                        <div className="invfilter-content">
+                            <div className="invfilter-location-grid">
+                                <label className="invfilter-location-field">
+                                    <span>Country</span>
+                                    <select
+                                        className="invfilter-select"
+                                        value={filters.country}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, country: e.target.value }))}
+                                    >
+                                        <option value="">All Countries</option>
+                                        {locationOptions.countries.map((country) => (
+                                            <option key={country} value={country}>{country}</option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="invfilter-location-field">
+                                    <span>State</span>
+                                    <select
+                                        className="invfilter-select"
+                                        value={filters.state}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, state: e.target.value }))}
+                                    >
+                                        <option value="">All States</option>
+                                        {locationOptions.states.map((state) => (
+                                            <option key={state} value={state}>{state}</option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="invfilter-location-field">
+                                    <span>City</span>
+                                    <select
+                                        className="invfilter-select"
+                                        value={filters.city}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, city: e.target.value }))}
+                                    >
+                                        <option value="">All Cities</option>
+                                        {locationOptions.cities.map((city) => (
+                                            <option key={city} value={city}>{city}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -1127,6 +1348,44 @@ const InventoryFilter = () => {
                     justify-content: space-between;
                 }
 
+                /* ---------- color mode ---------- */
+                .invfilter-color-panel {
+                    width: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+
+                .invfilter-color-modes {
+                    display: flex;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: 24px;
+                }
+
+                .invfilter-color-mode {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 14px;
+                    color: var(--color-text-dark);
+                    cursor: pointer;
+                    user-select: none;
+                }
+
+                .invfilter-color-mode input {
+                    width: 16px;
+                    height: 16px;
+                    margin: 0;
+                    accent-color: var(--color-primary);
+                    cursor: pointer;
+                }
+
+                .invfilter-color-mode.active {
+                    color: var(--color-primary);
+                    font-weight: 500;
+                }
+
                 /* ---------- small tiles ---------- */
                 .invfilter-tilegroup {
                     display: flex;
@@ -1257,6 +1516,44 @@ const InventoryFilter = () => {
                 }
 
                 .invfilter-number:focus {
+                    border-color: var(--color-primary);
+                }
+
+                /* ---------- location filters ---------- */
+                .invfilter-location-grid {
+                    width: 100%;
+                    display: grid;
+                    grid-template-columns: repeat(3, minmax(0, 1fr));
+                    gap: 12px;
+                }
+
+                .invfilter-location-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    font-size: 12px;
+                    color: var(--color-text-light);
+                }
+
+                .invfilter-location-field > span {
+                    font-weight: 500;
+                }
+
+                .invfilter-select {
+                    height: 38px;
+                    width: 100%;
+                    padding: 0 12px;
+                    border: 1px solid #cdc6bf;
+                    border-radius: 4px;
+                    background: #fff;
+                    color: var(--color-text-dark);
+                    font-family: inherit;
+                    font-size: 14px;
+                    outline: none;
+                    cursor: pointer;
+                }
+
+                .invfilter-select:focus {
                     border-color: var(--color-primary);
                 }
 
@@ -1488,6 +1785,10 @@ const InventoryFilter = () => {
                 @media (max-width: 576px) {
                     .invfilter-topbar {
                         padding: 10px 0;
+                    }
+
+                    .invfilter-location-grid {
+                        grid-template-columns: 1fr;
                     }
 
                     .invfilter-shape-grid {

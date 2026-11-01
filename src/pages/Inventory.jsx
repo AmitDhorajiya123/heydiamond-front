@@ -364,11 +364,29 @@ const loadAppliedFilters = () => {
     }
 };
 
+// Keep legacy /inventory?color=... links in sync with the filter page's
+// white-vs-fancy color modes.
+const WHITE_COLOR_GRADES = [
+    'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W-Z',
+];
+
+const FANCY_COLOR_NAMES = [
+    'YELLOW', 'ORANGE', 'PINK', 'BLUE', 'GREEN', 'CHAMPAGNE', 'BROWN',
+    'RED', 'WHITE', 'VIOLET', 'PURPLE', 'GRAY', 'OLIVE', 'BLACK',
+    'ORANGY YELLOW', 'ORANGE BROWN', 'PINK BROWN', 'GREEN YELLOW',
+    'BROWN YELLOW', 'COGNAC', 'CHAMELEON', 'OTHER',
+];
+
+const normalizeLegacyWhiteColor = (value) => (
+    ['W', 'X', 'Y', 'Z'].includes(value) ? 'W-Z' : value
+);
+
 // Backward compatibility: read filters from a legacy URL (?shape=...)
 const parseLegacyFilters = (searchParams) => {
     const initialFilters = {};
 
-    ['shape', 'color', 'clarity', 'cut', 'polish', 'symmetry',
+    ['shape', 'clarity', 'cut', 'polish', 'symmetry',
         'fluorescenceIntensity', 'fluorescenceColor', 'lab', 'location', 'status',
         'heartAndArrow', 'shade', 'milky', 'blackInclusion', 'whiteInclusion',
         'symbols'].forEach((key) => {
@@ -379,6 +397,31 @@ const parseLegacyFilters = (searchParams) => {
         }
     });
 
+    const colorParam = searchParams.get('color');
+    const rawColors = colorParam
+        ? colorParam.split(',').map((v) => v.trim().toUpperCase()).filter(Boolean)
+        : [];
+    const requestedColorMode = searchParams.get('colorMode');
+    const colorMode = requestedColorMode === 'white' || requestedColorMode === 'fancy'
+        ? requestedColorMode
+        : (rawColors.includes('FANCY') || rawColors.some((color) => FANCY_COLOR_NAMES.includes(color))
+            ? 'fancy'
+            : (rawColors.length ? 'white' : null));
+
+    if (colorMode) {
+        initialFilters.colorMode = colorMode;
+
+        if (colorMode === 'fancy') {
+            const fancyColors = rawColors.filter((color) => FANCY_COLOR_NAMES.includes(color));
+            if (fancyColors.length) initialFilters.color = fancyColors;
+        } else {
+            const whiteColors = rawColors
+                .map(normalizeLegacyWhiteColor)
+                .filter((color) => WHITE_COLOR_GRADES.includes(color));
+            if (whiteColors.length) initialFilters.color = whiteColors;
+        }
+    }
+
     ['weightMin', 'weightMax', 'pricePerCtMin', 'pricePerCtMax',
         'totalPriceMin', 'totalPriceMax',
         'depthMin', 'depthMax', 'tableMin', 'tableMax', 'ratioMin', 'ratioMax',
@@ -386,6 +429,7 @@ const parseLegacyFilters = (searchParams) => {
         'crownAngleMin', 'crownAngleMax', 'crownHeightMin', 'crownHeightMax',
         'pavilionAngleMin', 'pavilionAngleMax', 'pavilionDepthMin', 'pavilionDepthMax',
         'keyToSymbole', 'symbolMode',
+        'country', 'state', 'city',
         'noBgm', 'noBlack',
         'availableOnly', 'newOnly', 'offerOnly', 'upcomingOnly',
         'search'].forEach((key) => {
@@ -933,7 +977,7 @@ const Inventory = () => {
                             disabled={loading}
                             aria-label="Select number of entries per page"
                         >
-                            {[10, 25, 50, 100, 200].map((option) => (
+                            {[10, 25, 50, 100].map((option) => (
                                 <option key={option} value={option}>{option}</option>
                             ))}
                         </select>
