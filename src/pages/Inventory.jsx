@@ -227,6 +227,7 @@ const ColumnVisibilityModal = ({ isOpen, onClose, columns, visibleColumns, onTog
 const allColumns = [
     // Core Identification (matching Laravel table order)
     { key: 'id', label: 'ID', width: '60px' },
+    { key: 'apiName', label: 'API Name', width: '140px' },
     { key: 'stockNo', label: 'Stock No', width: '130px', required: true },
     { key: 'status', label: 'Status', width: '100px' },
     
@@ -344,6 +345,8 @@ const allColumns = [
     // Pricing
     { key: 'pricePerCt', label: '$/ct', width: '90px' },
     { key: 'totalPrice', label: 'Total $', width: '100px' },
+    { key: 'pricePerCtMarkup', label: '$/ct Markup', width: '110px' },
+    { key: 'totalPriceMarkup', label: 'Total $ Markup', width: '120px' },
     { key: 'discount', label: 'Discount %', width: '90px' },
     { key: 'exclusive', label: 'Exclusive', width: '90px' },
     
@@ -854,9 +857,48 @@ const Inventory = () => {
     };
 
     // Render cell content
-    const renderCell = (diamond, column) => {
+    const renderCell = (diamond, column, rowNumber) => {
         const value = diamond[column.key];
-        
+
+        // Show a running row number instead of the real DB id so the actual
+        // record id is never exposed in the listing.
+        if (column.key === 'id') {
+            return <span style={{ fontFamily: 'monospace' }}>{rowNumber}</span>;
+        }
+
+        // API source name (from the DB api_clients table)
+        if (column.key === 'apiName') {
+            const apiClient = apiClients.find(
+                (client) => String(client.id) === String(diamond.api_client_id)
+            );
+            return apiClient
+                ? <span>{apiClient.name}</span>
+                : <span style={{ color: 'var(--color-text-light)' }}>-</span>;
+        }
+
+        // Marked-up prices: base price + this API's markup percentage
+        if (column.key === 'pricePerCtMarkup' || column.key === 'totalPriceMarkup') {
+            const base = column.key === 'pricePerCtMarkup'
+                ? diamond.pricePerCt
+                : diamond.totalPrice;
+
+            if (base === null || base === undefined || base === '') {
+                return <span style={{ color: 'var(--color-text-light)' }}>-</span>;
+            }
+
+            const apiClient = apiClients.find(
+                (client) => String(client.id) === String(diamond.api_client_id)
+            );
+            const markup = Number(apiClient?.markup || 0);
+            const markedUp = Number(base) * (1 + markup / 100);
+
+            return (
+                <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>
+                    {formatCurrency(markedUp)}
+                </span>
+            );
+        }
+
         if (!value && value !== 0) return <span style={{ color: 'var(--color-text-light)' }}>-</span>;
 
         // Media columns
@@ -986,6 +1028,10 @@ const Inventory = () => {
                 return <span title={String(value)}>{String(value).length > 35 ? String(value).substring(0, 35) + '...' : String(value)}</span>;
         }
     };
+
+    // Columns actually rendered (visible + required) plus the Actions column.
+    const renderedColumns = allColumns.filter(col => visibleColumns.includes(col.key) || col.required);
+    const renderedColumnCount = renderedColumns.length + 1;
 
     return (
         <Layout>
@@ -1119,18 +1165,33 @@ const Inventory = () => {
                         </thead>
                         <tbody>
                             {diamonds.length === 0 ? (
-                                <tr>
-                                    <td colSpan={visibleColumns.filter(v => allColumns.some(c => c.key === v && !c.required)).length + 2} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-light)' }}>
-                                        {loading ? (
-                                            <>
-                                                <Loader2 size={24} className="spin" style={{ marginBottom: '12px', display: 'block', marginLeft: 'auto', marginRight: 'auto' }} />
-                                                <p>Loading diamonds...</p>
-                                            </>
-                                        ) : (
-                                            'No diamonds found'
-                                        )}
-                                    </td>
-                                </tr>
+                                loading ? (
+                                    <tr>
+                                        <td colSpan={renderedColumnCount} style={{ textAlign: 'center', padding: '40px', color: 'var(--color-text-light)' }}>
+                                            <Loader2 size={24} className="spin" style={{ marginBottom: '12px', display: 'block', marginLeft: 'auto', marginRight: 'auto' }} />
+                                            <p>Loading diamonds...</p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <tr>
+                                        {Array.from({ length: Math.ceil(renderedColumnCount / 15) }).map((_, index) => (
+                                            <td
+                                                key={`no-diamonds-${index}`}
+                                                colSpan={Math.min(15, renderedColumnCount - index * 15)}
+                                                style={{
+                                                    textAlign: 'center',
+                                                    padding: '40px 8px',
+                                                    color: 'var(--color-text-light)',
+                                                    whiteSpace: 'nowrap',
+                                                    borderLeft: 'none',
+                                                    borderRight: 'none',
+                                                }}
+                                            >
+                                                No diamonds found
+                                            </td>
+                                        ))}
+                                    </tr>
+                                )
                             ) : (
                                 diamonds.map((diamond, index) => (
                                     <tr key={diamond.id}>
@@ -1139,9 +1200,9 @@ const Inventory = () => {
                                             .map((column) => (
                                                 <td key={column.key} style={{ 
                                                     fontSize: column.key === 'stockNo' ? '12px' : '11px',
-                                                    fontFamily: column.key === 'stockNo' || column.key === 'weight' || column.key === 'pricePerCt' || column.key === 'totalPrice' ? 'monospace' : 'inherit'
+                                                    fontFamily: ['stockNo', 'weight', 'pricePerCt', 'totalPrice', 'pricePerCtMarkup', 'totalPriceMarkup'].includes(column.key) ? 'monospace' : 'inherit'
                                                 }}>
-                                                    {renderCell(diamond, column)}
+                                                    {renderCell(diamond, column, (currentPage - 1) * perPage + index + 1)}
                                                 </td>
                                             ))}
                                         <td>

@@ -104,7 +104,7 @@ const inferColorMode = (mode, colors) => {
 
 const CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2', 'I3'];
 
-const FINISH_GRADES = ['EX', 'VG', 'GD'];
+const FINISH_GRADES = ['8X', 'Ideal', 'Excellent', 'Very Good', 'Good', 'Fair', 'Poor'];
 
 const FLUORESCENCE = ['NONE', 'FAINT', 'MEDIUM', 'STRONG', 'V.STRONG'];
 
@@ -115,6 +115,19 @@ const DEFAULT_LOCATION_OPTIONS = {
     states: ['Gujarat'],
     cities: ['Surat'],
 };
+
+/* Default quick-search shortcuts for the Location filter */
+const DEFAULT_LOCATION_SHORTCUTS = [
+    { value: 'INDIA', type: 'country' },
+    { value: 'MUMBAI', type: 'city' },
+    { value: 'SURAT', type: 'city' },
+    { value: 'USA', type: 'country' },
+    { value: 'NEW YORK', type: 'city' },
+    { value: 'LA', type: 'city' },
+    { value: 'UAE', type: 'country' },
+    { value: 'HK', type: 'country' },
+    { value: 'Belgium', type: 'country' },
+];
 
 const SIZE_OPTIONS = [
     { label: '30s', min: 0.30, max: 0.39 },
@@ -138,14 +151,15 @@ const emptyFilters = {
     colors: [],
     clarities: [],
     sizes: [],
+    cut: [],
     polish: [],
     symmetry: [],
     fluorescence: [],
     labs: [],
     fancyColorIntensity: [],
-    country: '',
-    state: '',
-    city: '',
+    country: [],
+    state: [],
+    city: [],
 };
 
 const emptyAdvance = {
@@ -221,6 +235,17 @@ const commaList = (params, key) => {
 
 const knownOnly = (values, allowed) => values.filter((v) => allowed.includes(v));
 
+/* Location values can be a single string (old saved state) or an array */
+const normalizeList = (value) => {
+    if (Array.isArray(value)) {
+        return value.filter((item) => typeof item === 'string' && item !== '');
+    }
+    if (typeof value === 'string' && value !== '') {
+        return [value];
+    }
+    return [];
+};
+
 /* Try to map a weight range back to the general size tiles */
 const restoreSizes = (weightMin, weightMax) => {
     const minNum = weightMin !== '' ? parseFloat(weightMin) : null;
@@ -286,14 +311,15 @@ const parseFiltersFromParams = (params) => {
         colors: colorValues,
         clarities: knownOnly(commaList(params, 'clarity'), CLARITIES),
         sizes: sizeState.sizes,
+        cut: knownOnly(commaList(params, 'cut'), FINISH_GRADES),
         polish: knownOnly(commaList(params, 'polish'), FINISH_GRADES),
         symmetry: knownOnly(commaList(params, 'symmetry'), FINISH_GRADES),
         fluorescence: knownOnly(commaList(params, 'fluorescenceIntensity'), FLUORESCENCE),
         labs: knownOnly(commaList(params, 'lab'), LAB_OPTIONS),
         fancyColorIntensity: knownOnly(commaList(params, 'fancyColorIntensity'), FANCY_COLOR_INTENSITIES),
-        country: params.get('country') || '',
-        state: params.get('state') || '',
-        city: params.get('city') || '',
+        country: commaList(params, 'country'),
+        state: commaList(params, 'state'),
+        city: commaList(params, 'city'),
     };
 
     const adv = { ...emptyAdvance };
@@ -365,6 +391,9 @@ const InventoryFilter = () => {
         );
         next.labs = knownOnly(next.labs || [], LAB_OPTIONS);
         next.fancyColorIntensity = knownOnly(next.fancyColorIntensity || [], FANCY_COLOR_INTENSITIES);
+        next.country = normalizeList(next.country);
+        next.state = normalizeList(next.state);
+        next.city = normalizeList(next.city);
         return next;
     });
     const [colorMode, setColorMode] = useState(() => initialState.colorMode || 'white');
@@ -409,6 +438,41 @@ const InventoryFilter = () => {
             cancelled = true;
         };
     }, []);
+
+    /* Default quick location shortcuts (country / city mixed) */
+    const locationShortcuts = useMemo(() => {
+        const matches = (list, value) => (list || []).some(
+            (item) => String(item).toLowerCase() === String(value).toLowerCase()
+        );
+
+        return DEFAULT_LOCATION_SHORTCUTS.map((shortcut) => {
+            if (matches(locationOptions.countries, shortcut.value)) {
+                return { ...shortcut, type: 'country' };
+            }
+            if (matches(locationOptions.states, shortcut.value)) {
+                return { ...shortcut, type: 'state' };
+            }
+            if (matches(locationOptions.cities, shortcut.value)) {
+                return { ...shortcut, type: 'city' };
+            }
+            return shortcut;
+        });
+    }, [locationOptions]);
+
+    const applyLocationShortcut = (shortcut) => {
+        setFilters((prev) => {
+            if (!shortcut) {
+                return { ...prev, country: [], state: [], city: [] };
+            }
+
+            const current = Array.isArray(prev[shortcut.type]) ? prev[shortcut.type] : [];
+            const nextValues = current.includes(shortcut.value)
+                ? current.filter((value) => value !== shortcut.value)
+                : [...current, shortcut.value];
+
+            return { ...prev, [shortcut.type]: nextValues };
+        });
+    };
 
     /* Toggle a tile inside a group */
     const toggle = (group, value) => {
@@ -471,14 +535,15 @@ const InventoryFilter = () => {
         appliedFilters.colorMode = colorMode;
         if (filters.colors.length) appliedFilters.color = filters.colors;
         if (filters.clarities.length) appliedFilters.clarity = filters.clarities;
+        if (filters.cut.length) appliedFilters.cut = filters.cut;
         if (filters.polish.length) appliedFilters.polish = filters.polish;
         if (filters.symmetry.length) appliedFilters.symmetry = filters.symmetry;
         if (filters.fluorescence.length) appliedFilters.fluorescenceIntensity = filters.fluorescence;
         if (filters.labs.length) appliedFilters.lab = filters.labs;
         if (filters.fancyColorIntensity.length) appliedFilters.fancyColorIntensity = filters.fancyColorIntensity;
-        if (filters.country) appliedFilters.country = filters.country;
-        if (filters.state) appliedFilters.state = filters.state;
-        if (filters.city) appliedFilters.city = filters.city;
+        if (filters.country?.length) appliedFilters.country = filters.country;
+        if (filters.state?.length) appliedFilters.state = filters.state;
+        if (filters.city?.length) appliedFilters.city = filters.city;
 
         /* Stock id / certificate number */
         if (stockId.trim()) appliedFilters.search = stockId.trim();
@@ -876,18 +941,28 @@ const InventoryFilter = () => {
                         <div className="invfilter-content">{renderTiles('clarities', CLARITIES)}</div>
                     </div>
 
-                    {/* Finish */}
+                    {/* Cut */}
                     <div className="invfilter-row">
                         <div className="invfilter-label-col">
-                            <span className="invfilter-label">Finish</span>
-                            {renderSubtabs(finishTab, setFinishTab)}
+                            <span className="invfilter-label">Cut</span>
                         </div>
-                        <div className="invfilter-content">
-                            <span className="invfilter-inline-label">Pol.</span>
-                            {renderTiles('polish', FINISH_GRADES)}
-                            <span className="invfilter-inline-label invfilter-inline-label-spaced">Sym.</span>
-                            {renderTiles('symmetry', FINISH_GRADES)}
+                        <div className="invfilter-content">{renderTiles('cut', FINISH_GRADES)}</div>
+                    </div>
+
+                    {/* Polish */}
+                    <div className="invfilter-row">
+                        <div className="invfilter-label-col">
+                            <span className="invfilter-label">Polish</span>
                         </div>
+                        <div className="invfilter-content">{renderTiles('polish', FINISH_GRADES)}</div>
+                    </div>
+
+                    {/* Symmetry */}
+                    <div className="invfilter-row">
+                        <div className="invfilter-label-col">
+                            <span className="invfilter-label">Symmetry</span>
+                        </div>
+                        <div className="invfilter-content">{renderTiles('symmetry', FINISH_GRADES)}</div>
                     </div>
 
                     {/* Fluorescence intensity */}
@@ -934,18 +1009,43 @@ const InventoryFilter = () => {
                             <span className="invfilter-label">Location</span>
                         </div>
                         <div className="invfilter-content">
+                            <div className="invfilter-tilegroup invfilter-location-shortcuts">
+                                <button
+                                    type="button"
+                                    className={`invfilter-tile ${!(filters.country?.length || filters.state?.length || filters.city?.length) ? 'active' : ''}`}
+                                    onClick={() => applyLocationShortcut(null)}
+                                >
+                                    All
+                                </button>
+                                {locationShortcuts.map((shortcut) => (
+                                    <button
+                                        type="button"
+                                        key={`${shortcut.type}:${shortcut.value}`}
+                                        className={`invfilter-tile ${(filters[shortcut.type] || []).includes(shortcut.value) ? 'active' : ''}`}
+                                        onClick={() => applyLocationShortcut(shortcut)}
+                                        title={`${shortcut.type === 'country' ? 'Country' : shortcut.type === 'state' ? 'State' : 'City'}: ${shortcut.value}`}
+                                    >
+                                        {shortcut.value}
+                                    </button>
+                                ))}
+                            </div>
                             <div className="invfilter-location-grid">
                                 <label className="invfilter-location-field">
                                     <span>Country</span>
                                     <select
                                         className="invfilter-select"
-                                        value={filters.country}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, country: e.target.value }))}
+                                        value={(filters.country || [])[0] || ''}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, country: e.target.value ? [e.target.value] : [] }))}
                                     >
                                         <option value="">All Countries</option>
                                         {locationOptions.countries.map((country) => (
                                             <option key={country} value={country}>{country}</option>
                                         ))}
+                                        {(filters.country || [])
+                                            .filter((value) => !locationOptions.countries.includes(value))
+                                            .map((value) => (
+                                                <option key={value} value={value}>{value}</option>
+                                            ))}
                                     </select>
                                 </label>
 
@@ -953,13 +1053,18 @@ const InventoryFilter = () => {
                                     <span>State</span>
                                     <select
                                         className="invfilter-select"
-                                        value={filters.state}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, state: e.target.value }))}
+                                        value={(filters.state || [])[0] || ''}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, state: e.target.value ? [e.target.value] : [] }))}
                                     >
                                         <option value="">All States</option>
                                         {locationOptions.states.map((state) => (
                                             <option key={state} value={state}>{state}</option>
                                         ))}
+                                        {(filters.state || [])
+                                            .filter((value) => !locationOptions.states.includes(value))
+                                            .map((value) => (
+                                                <option key={value} value={value}>{value}</option>
+                                            ))}
                                     </select>
                                 </label>
 
@@ -967,13 +1072,18 @@ const InventoryFilter = () => {
                                     <span>City</span>
                                     <select
                                         className="invfilter-select"
-                                        value={filters.city}
-                                        onChange={(e) => setFilters((prev) => ({ ...prev, city: e.target.value }))}
+                                        value={(filters.city || [])[0] || ''}
+                                        onChange={(e) => setFilters((prev) => ({ ...prev, city: e.target.value ? [e.target.value] : [] }))}
                                     >
                                         <option value="">All Cities</option>
                                         {locationOptions.cities.map((city) => (
                                             <option key={city} value={city}>{city}</option>
                                         ))}
+                                        {(filters.city || [])
+                                            .filter((value) => !locationOptions.cities.includes(value))
+                                            .map((value) => (
+                                                <option key={value} value={value}>{value}</option>
+                                            ))}
                                     </select>
                                 </label>
                             </div>
@@ -1520,6 +1630,10 @@ const InventoryFilter = () => {
                 }
 
                 /* ---------- location filters ---------- */
+                .invfilter-location-shortcuts {
+                    margin-bottom: 12px;
+                }
+
                 .invfilter-location-grid {
                     width: 100%;
                     display: grid;

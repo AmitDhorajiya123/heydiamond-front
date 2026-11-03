@@ -61,6 +61,12 @@ export const diamondApi = {
         return response.data;
     },
 
+    // Update an existing external API client
+    updateApiClient: async (id, data = {}) => {
+        const response = await api.put(`/diamonds/api-clients/${id}`, data);
+        return response.data;
+    },
+
     // Remove an external API client
     deleteApiClient: async (id) => {
         const response = await api.delete(`/diamonds/api-clients/${id}`);
