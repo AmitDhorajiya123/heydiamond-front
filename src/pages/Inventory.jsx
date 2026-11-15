@@ -29,6 +29,49 @@ import Pagination from '../components/Pagination';
 import diamondApi from '../apis/diamond';
 import { useToast } from '../context/ToastContext';
 
+// Resolve the markup % for a diamond from its API client's price-range slabs.
+// Ranges are based on $/ct; the matched % is applied to both $/ct and Total $.
+const resolveMarkupPercent = (apiClient, diamond) => {
+    if (!apiClient) return 0;
+
+    const fallback = Number(apiClient.markup || 0);
+    const ranges = Array.isArray(apiClient.markups) ? apiClient.markups : [];
+
+    if (!ranges.length) return fallback;
+
+    const rawValue = diamond.pricePerCt;
+    const value = Number(rawValue);
+
+    if (rawValue === null || rawValue === undefined || rawValue === '' || !Number.isFinite(value)) {
+        return fallback;
+    }
+
+    const sorted = ranges
+        .map((range) => ({
+            min: Number(range.min_value),
+            max: range.max_value === null || range.max_value === undefined || range.max_value === ''
+                ? null
+                : Number(range.max_value),
+            markup: Number(range.markup),
+        }))
+        .filter((range) => Number.isFinite(range.min) && Number.isFinite(range.markup))
+        .sort((a, b) => a.min - b.min);
+
+    let matched = sorted.find((range) => (
+        value >= range.min && (range.max === null || value <= range.max)
+    ));
+
+    // Decimal prices can fall between integer tiers (e.g. 100.50 between
+    // 0-100 and 101-200). In that case keep the highest tier whose From <= value.
+    if (!matched) {
+        for (const range of sorted) {
+            if (value >= range.min) matched = range;
+        }
+    }
+
+    return matched ? matched.markup : fallback;
+};
+
 // Media Preview Modal Component
 const MediaPreviewModal = ({ isOpen, onClose, media }) => {
     if (!isOpen || !media) return null;
@@ -898,7 +941,7 @@ const Inventory = () => {
             const apiClient = apiClients.find(
                 (client) => String(client.id) === String(diamond.api_client_id)
             );
-            const markup = Number(apiClient?.markup || 0);
+            const markup = resolveMarkupPercent(apiClient, diamond);
             const markedUp = Number(base) * (1 + markup / 100);
 
             return (

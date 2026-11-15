@@ -4,7 +4,33 @@ import Layout from '../components/Layout';
 import diamondApi from '../apis/diamond';
 import { useToast } from '../context/ToastContext';
 
-const emptyForm = { name: '', url: '', markup: '' };
+const createEmptyForm = () => ({
+    name: '',
+    url: '',
+    markup: '',
+    markups: [],
+});
+
+const emptyRange = { min_value: '', max_value: '', markup: '' };
+
+const formatRangeValue = (value) => {
+    if (value === null || value === undefined || value === '') return '';
+    const number = Number(value);
+    if (!Number.isFinite(number)) return String(value);
+    return number.toLocaleString('en-US', { maximumFractionDigits: 2 });
+};
+
+const formatRange = (range) => {
+    const min = formatRangeValue(range.min_value);
+    const hasMax = range.max_value !== null && range.max_value !== undefined && range.max_value !== '';
+    return hasMax ? `${min} – ${formatRangeValue(range.max_value)}` : `${min}+`;
+};
+
+const parseOptionalNumber = (value) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const number = Number(value);
+    return Number.isFinite(number) ? number : NaN;
+};
 
 const ApiClientPage = () => {
     const { showToast } = useToast();
@@ -16,7 +42,7 @@ const ApiClientPage = () => {
     // Add / edit modal
     const [formOpen, setFormOpen] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [form, setForm] = useState(emptyForm);
+    const [form, setForm] = useState(createEmptyForm);
     const [formError, setFormError] = useState('');
 
     // Delete confirmation modal
@@ -48,7 +74,7 @@ const ApiClientPage = () => {
 
     const openCreate = () => {
         setEditingId(null);
-        setForm(emptyForm);
+        setForm(createEmptyForm());
         setFormError('');
         setFormOpen(true);
     };
@@ -59,6 +85,13 @@ const ApiClientPage = () => {
             name: client.name || '',
             url: client.url || '',
             markup: client.markup !== undefined && client.markup !== null ? String(client.markup) : '',
+            markups: Array.isArray(client.markups)
+                ? client.markups.map((range) => ({
+                    min_value: range.min_value !== undefined && range.min_value !== null ? String(range.min_value) : '',
+                    max_value: range.max_value !== undefined && range.max_value !== null ? String(range.max_value) : '',
+                    markup: range.markup !== undefined && range.markup !== null ? String(range.markup) : '',
+                }))
+                : [],
         });
         setFormError('');
         setFormOpen(true);
@@ -68,8 +101,40 @@ const ApiClientPage = () => {
         if (saving) return;
         setFormOpen(false);
         setEditingId(null);
-        setForm(emptyForm);
+        setForm(createEmptyForm());
         setFormError('');
+    };
+
+    const addRange = () => {
+        setForm((prev) => ({ ...prev, markups: [...prev.markups, { ...emptyRange }] }));
+    };
+
+    const updateRange = (index, key, value) => {
+        setForm((prev) => ({
+            ...prev,
+            markups: prev.markups.map((range, rangeIndex) => (
+                rangeIndex === index ? { ...range, [key]: value } : range
+            )),
+        }));
+    };
+
+    const removeRange = (index) => {
+        setForm((prev) => ({
+            ...prev,
+            markups: prev.markups.filter((_, rangeIndex) => rangeIndex !== index),
+        }));
+    };
+
+    const applyStandardTiers = () => {
+        setForm((prev) => ({
+            ...prev,
+            markups: [
+                { min_value: '0', max_value: '100', markup: '' },
+                { min_value: '101', max_value: '200', markup: '' },
+                { min_value: '201', max_value: '300', markup: '' },
+                { min_value: '301', max_value: '', markup: '' },
+            ],
+        }));
     };
 
     const handleSubmit = async (event) => {
@@ -89,13 +154,62 @@ const ApiClientPage = () => {
             return;
         }
         if (Number.isNaN(markup) || markup < 0) {
-            setFormError('Markup must be a valid percentage (0 or more).');
+            setFormError('Default markup must be a valid percentage (0 or more).');
             return;
+        }
+
+        // Validate every range before sending it to the backend.
+        let ranges = [];
+        try {
+            ranges = form.markups.map((range, index) => {
+                const min = parseOptionalNumber(range.min_value);
+                const max = parseOptionalNumber(range.max_value);
+                const rangeMarkup = parseOptionalNumber(range.markup);
+
+                if (min === null || Number.isNaN(min) || min < 0) {
+                    throw new Error(`Range ${index + 1}: enter a valid "From" value.`);
+                }
+                if (max !== null && (Number.isNaN(max) || max < min)) {
+                    throw new Error(`Range ${index + 1}: "To" must be greater than or equal to "From".`);
+                }
+                if (rangeMarkup === null || Number.isNaN(rangeMarkup) || rangeMarkup < 0) {
+                    throw new Error(`Range ${index + 1}: enter a valid markup %.`);
+                }
+
+                return { min, max, markup: rangeMarkup };
+            });
+        } catch (err) {
+            setFormError(err.message);
+            return;
+        }
+
+        const sortedRanges = [...ranges].sort((a, b) => a.min - b.min);
+
+        for (let index = 1; index < sortedRanges.length; index += 1) {
+            const previous = sortedRanges[index - 1];
+
+            if (previous.max === null) {
+                setFormError('Only the last range can have an empty "To" value.');
+                return;
+            }
+            if (sortedRanges[index].min <= previous.max) {
+                setFormError('Markup ranges must not overlap.');
+                return;
+            }
         }
 
         setSaving(true);
         try {
-            const payload = { name, url, markup };
+            const payload = {
+                name,
+                url,
+                markup,
+                markups: sortedRanges.map((range) => ({
+                    min_value: range.min,
+                    max_value: range.max,
+                    markup: range.markup,
+                })),
+            };
 
             if (editingId) {
                 await diamondApi.updateApiClient(editingId, payload);
@@ -107,10 +221,10 @@ const ApiClientPage = () => {
 
             setFormOpen(false);
             setEditingId(null);
-            setForm(emptyForm);
+            setForm(createEmptyForm());
             await loadApiClients();
         } catch (err) {
-            const message = err?.response?.data?.message || 'Failed to save API client.';
+            const message = err?.response?.data?.message || err?.message || 'Failed to save API client.';
             setFormError(message);
         } finally {
             setSaving(false);
@@ -151,9 +265,9 @@ const ApiClientPage = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '200px' }}>API Name</th>
-                                <th style={{ width: '420px' }}>API URL</th>
-                                <th style={{ width: '130px' }}>Markup %</th>
+                                <th style={{ width: '180px' }}>API Name</th>
+                                <th style={{ width: '360px' }}>API URL</th>
+                                <th style={{ width: '250px' }}>Markup Ranges ($/ct)</th>
                                 <th style={{ width: '160px' }}>Actions</th>
                             </tr>
                         </thead>
@@ -168,9 +282,28 @@ const ApiClientPage = () => {
                                     </td>
                                     <td style={{ fontSize: '11px', fontFamily: 'monospace' }}>{client.url}</td>
                                     <td>
-                                        <span className="status-badge status-available">
-                                            {Number(client.markup || 0).toFixed(2)}%
-                                        </span>
+                                        {Array.isArray(client.markups) && client.markups.length > 0 ? (
+                                            <div className="markup-range-summary">
+                                                {client.markups.slice(0, 4).map((range, index) => (
+                                                    <div className="markup-range-summary-row" key={range.id ?? index}>
+                                                        <span>{formatRange(range)}</span>
+                                                        <strong>{Number(range.markup || 0).toFixed(2)}%</strong>
+                                                    </div>
+                                                ))}
+                                                {client.markups.length > 4 && (
+                                                    <span className="markup-range-more">
+                                                        +{client.markups.length - 4} more range{client.markups.length - 4 === 1 ? '' : 's'}
+                                                    </span>
+                                                )}
+                                                <span className="markup-range-default">
+                                                    Default: {Number(client.markup || 0).toFixed(2)}%
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="status-badge status-available">
+                                                {Number(client.markup || 0).toFixed(2)}%
+                                            </span>
+                                        )}
                                     </td>
                                     <td>
                                         <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-start' }}>
@@ -217,7 +350,7 @@ const ApiClientPage = () => {
             {/* Add / Edit API Client Modal */}
             {formOpen && (
                 <div className="modal-overlay" onClick={closeForm}>
-                    <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+                    <div className="modal-container modal-wide" onClick={(e) => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2 className="modal-title">{editingId ? 'Edit API Client' : 'Add API Client'}</h2>
                             <button type="button" className="modal-close" onClick={closeForm}>
@@ -252,7 +385,7 @@ const ApiClientPage = () => {
                                 </div>
 
                                 <div className="form-group">
-                                    <label className="form-label">Markup Margin (%)</label>
+                                    <label className="form-label">Default Markup (%)</label>
                                     <input
                                         className="form-input"
                                         type="number"
@@ -262,9 +395,85 @@ const ApiClientPage = () => {
                                         onChange={(e) => setForm((prev) => ({ ...prev, markup: e.target.value }))}
                                         placeholder="0.00"
                                     />
-                                    <p style={{ margin: '6px 0 0', fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                        Percentage added to $/ct and total price on the inventory listing.
+                                    <p className="form-help">
+                                        Used when a diamond does not match any range below.
                                     </p>
+                                </div>
+
+                                <div className="form-group">
+                                    <div className="markup-ranges-header">
+                                        <div>
+                                            <label className="form-label" style={{ marginBottom: 0 }}>
+                                                Markup Ranges ($/ct)
+                                            </label>
+                                            <p className="form-help" style={{ margin: '4px 0 0' }}>
+                                                The matched range&apos;s % is added to both $/ct and Total $.
+                                            </p>
+                                        </div>
+                                        <div className="markup-ranges-actions">
+                                            <button type="button" className="markup-range-btn" onClick={applyStandardTiers}>
+                                                Standard tiers
+                                            </button>
+                                            <button type="button" className="markup-range-btn primary" onClick={addRange}>
+                                                <Plus size={12} style={{ marginRight: '4px' }} />
+                                                Add range
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {form.markups.length > 0 ? (
+                                        <div className="markup-ranges-table">
+                                            <div className="markup-range-labels">
+                                                <span>From ($/ct)</span>
+                                                <span>To ($/ct)</span>
+                                                <span>Markup (%)</span>
+                                                <span />
+                                            </div>
+                                            {form.markups.map((range, index) => (
+                                                <div className="markup-range-row" key={index}>
+                                                    <input
+                                                        className="form-input"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={range.min_value}
+                                                        onChange={(e) => updateRange(index, 'min_value', e.target.value)}
+                                                        placeholder="0"
+                                                    />
+                                                    <input
+                                                        className="form-input"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={range.max_value}
+                                                        onChange={(e) => updateRange(index, 'max_value', e.target.value)}
+                                                        placeholder="All"
+                                                    />
+                                                    <input
+                                                        className="form-input"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={range.markup}
+                                                        onChange={(e) => updateRange(index, 'markup', e.target.value)}
+                                                        placeholder="0.00"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        className="markup-range-remove"
+                                                        onClick={() => removeRange(index)}
+                                                        title="Remove range"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="markup-ranges-empty">
+                                            No ranges configured. The default markup is used for every diamond.
+                                        </p>
+                                    )}
                                 </div>
 
                                 {formError && <p className="form-error">{formError}</p>}
