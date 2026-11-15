@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -417,6 +417,169 @@ const InventoryFilter = () => {
     const [keySymbols, setKeySymbols] = useState(() => initialState.keySymbols || []);
     const [locationOptions, setLocationOptions] = useState(DEFAULT_LOCATION_OPTIONS);
 
+    /* ------------------------------------------------------------------ */
+    /* Drag-to-select: press on a tile and sweep the pointer across tiles  */
+    /* to select (or deselect) everything it passes over in the same group. */
+    /* ------------------------------------------------------------------ */
+    const dragStateRef = useRef(null);
+    const suppressClickRef = useRef(false);
+
+    const setTileSelection = (group, value, selected) => {
+        if (group.startsWith('adv:')) {
+            const key = group.slice(4);
+            setAdv((prev) => {
+                const current = prev[key] || [];
+                const exists = current.includes(value);
+                if (selected === exists) return prev;
+                return {
+                    ...prev,
+                    [key]: selected ? [...current, value] : current.filter((v) => v !== value),
+                };
+            });
+            return;
+        }
+
+        if (group === 'loc') {
+            const separator = value.indexOf(':');
+            const type = value.slice(0, separator);
+            const locationValue = value.slice(separator + 1);
+            setFilters((prev) => {
+                const current = Array.isArray(prev[type]) ? prev[type] : [];
+                const exists = current.includes(locationValue);
+                if (selected === exists) return prev;
+                return {
+                    ...prev,
+                    [type]: selected ? [...current, locationValue] : current.filter((v) => v !== locationValue),
+                };
+            });
+            return;
+        }
+
+        if (group === 'symbols') {
+            setKeySymbols((prev) => {
+                const exists = prev.includes(value);
+                if (selected === exists) return prev;
+                return selected ? [...prev, value] : prev.filter((v) => v !== value);
+            });
+            return;
+        }
+
+        setFilters((prev) => {
+            const current = prev[group] || [];
+            const exists = current.includes(value);
+            if (selected === exists) return prev;
+            return {
+                ...prev,
+                [group]: selected ? [...current, value] : current.filter((v) => v !== value),
+            };
+        });
+    };
+
+    const handleTilePointerDown = (event) => {
+        // A fresh press always clears the previous drag's click suppression.
+        suppressClickRef.current = false;
+
+        if (event.button !== 0) return;
+
+        const tile = event.target.closest?.('[data-drag-group]');
+        if (!tile) return;
+
+        const group = tile.getAttribute('data-drag-group');
+        const value = tile.getAttribute('data-drag-value');
+        if (!group || value === null) return;
+
+        const selected = tile.getAttribute('data-drag-selected') === 'true';
+
+        dragStateRef.current = {
+            group,
+            value,
+            // Dragging from an unselected tile selects; from a selected tile deselects.
+            select: !selected,
+            visited: new Set([`${group}\u0000${value}`]),
+            startX: event.clientX,
+            startY: event.clientY,
+            moved: false,
+        };
+    };
+
+    const handleTilePointerMove = (event) => {
+        const drag = dragStateRef.current;
+        if (!drag) return;
+
+        if (!drag.moved) {
+            const dx = event.clientX - drag.startX;
+            const dy = event.clientY - drag.startY;
+            if (Math.hypot(dx, dy) < 5) return;
+
+            drag.moved = true;
+            document.body.style.userSelect = 'none';
+
+            // The press itself becomes part of the drag: apply the target state
+            // to the tile where the drag started too.
+            setTileSelection(drag.group, drag.value, drag.select);
+        }
+
+        const element = document.elementFromPoint(event.clientX, event.clientY);
+        const tile = element?.closest?.('[data-drag-group]');
+        if (!tile) return;
+
+        const group = tile.getAttribute('data-drag-group');
+        const value = tile.getAttribute('data-drag-value');
+
+        // Only paint inside the group where the drag started.
+        if (group !== drag.group || value === null) return;
+
+        const key = `${group}\u0000${value}`;
+        if (drag.visited.has(key)) return;
+
+        drag.visited.add(key);
+        setTileSelection(group, value, drag.select);
+    };
+
+    const handleTilePointerUp = () => {
+        const drag = dragStateRef.current;
+        if (!drag) return;
+
+        // If the pointer actually moved, swallow the click that follows so the
+        // tile is not toggled a second time.
+        if (drag.moved) {
+            suppressClickRef.current = true;
+        }
+
+        dragStateRef.current = null;
+        document.body.style.userSelect = '';
+    };
+
+    const handlePanelClickCapture = (event) => {
+        if (!suppressClickRef.current) return;
+
+        const tile = event.target.closest?.('[data-drag-group]');
+        if (!tile) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        suppressClickRef.current = false;
+    };
+
+    // If the pointer is released outside the filter panel, still finish the drag.
+    useEffect(() => {
+        const endDrag = () => {
+            const drag = dragStateRef.current;
+            if (!drag) return;
+            if (drag.moved) suppressClickRef.current = true;
+            dragStateRef.current = null;
+            document.body.style.userSelect = '';
+        };
+
+        window.addEventListener('pointerup', endDrag);
+        window.addEventListener('pointercancel', endDrag);
+
+        return () => {
+            window.removeEventListener('pointerup', endDrag);
+            window.removeEventListener('pointercancel', endDrag);
+        };
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -640,6 +803,9 @@ const InventoryFilter = () => {
                     key={value}
                     className={`invfilter-tile ${filters[group].includes(value) ? 'active' : ''}`}
                     onClick={() => toggle(group, value)}
+                    data-drag-group={group}
+                    data-drag-value={value}
+                    data-drag-selected={filters[group].includes(value)}
                 >
                     {value}
                 </button>
@@ -674,6 +840,9 @@ const InventoryFilter = () => {
                     key={value}
                     className={`invfilter-tile ${adv[group].includes(value) ? 'active' : ''}`}
                     onClick={() => toggleAdv(group, value)}
+                    data-drag-group={`adv:${group}`}
+                    data-drag-value={value}
+                    data-drag-selected={adv[group].includes(value)}
                 >
                     {value}
                 </button>
@@ -739,7 +908,14 @@ const InventoryFilter = () => {
                 </div>
 
                 {/* Filter panel */}
-                <div className="invfilter-panel">
+                <div
+                    className="invfilter-panel"
+                    onPointerDown={handleTilePointerDown}
+                    onPointerMove={handleTilePointerMove}
+                    onPointerUp={handleTilePointerUp}
+                    onPointerCancel={handleTilePointerUp}
+                    onClickCapture={handlePanelClickCapture}
+                >
                     {/* Shape */}
                     <div className="invfilter-row">
                         <div className="invfilter-label-col">
@@ -754,6 +930,9 @@ const InventoryFilter = () => {
                                         className={`invfilter-shape-tile ${filters.shapes.includes(value) ? 'active' : ''}`}
                                         onClick={() => toggle('shapes', value)}
                                         title={label}
+                                        data-drag-group="shapes"
+                                        data-drag-value={value}
+                                        data-drag-selected={filters.shapes.includes(value)}
                                     >
                                         <ShapeIcon type={label} />
                                         <span>{label}</span>
@@ -828,6 +1007,9 @@ const InventoryFilter = () => {
                                             key={size.label}
                                             className={`invfilter-tile ${filters.sizes.includes(size.label) ? 'active' : ''}`}
                                             onClick={() => toggle('sizes', size.label)}
+                                            data-drag-group="sizes"
+                                            data-drag-value={size.label}
+                                            data-drag-selected={filters.sizes.includes(size.label)}
                                         >
                                             {size.label}
                                         </button>
@@ -903,6 +1085,9 @@ const InventoryFilter = () => {
                                             key={value}
                                             className={`invfilter-tile ${filters.colors.includes(value) ? 'active' : ''}`}
                                             onClick={() => toggle('colors', value)}
+                                            data-drag-group="colors"
+                                            data-drag-value={value}
+                                            data-drag-selected={filters.colors.includes(value)}
                                         >
                                             {value}
                                         </button>
@@ -911,6 +1096,18 @@ const InventoryFilter = () => {
                             </div>
                         </div>
                     </div>
+
+
+                    {/* Lab */}
+                    <div className="invfilter-row">
+                        <div className="invfilter-label-col">
+                            <span className="invfilter-label">Lab</span>
+                        </div>
+                        <div className="invfilter-content">
+                            {renderTiles('labs', LAB_OPTIONS)}
+                        </div>
+                    </div>
+
 
                     {/* Fancy color intensity */}
                     <div className="invfilter-row">
@@ -925,6 +1122,9 @@ const InventoryFilter = () => {
                                         key={value}
                                         className={`invfilter-tile ${filters.fancyColorIntensity.includes(value) ? 'active' : ''}`}
                                         onClick={() => toggle('fancyColorIntensity', value)}
+                                        data-drag-group="fancyColorIntensity"
+                                        data-drag-value={value}
+                                        data-drag-selected={filters.fancyColorIntensity.includes(value)}
                                     >
                                         {value}
                                     </button>
@@ -993,16 +1193,6 @@ const InventoryFilter = () => {
                         </div>
                     </div>
 
-                    {/* Lab */}
-                    <div className="invfilter-row">
-                        <div className="invfilter-label-col">
-                            <span className="invfilter-label">Lab</span>
-                        </div>
-                        <div className="invfilter-content">
-                            {renderTiles('labs', LAB_OPTIONS)}
-                        </div>
-                    </div>
-
                     {/* Location: country / state / city */}
                     <div className="invfilter-row">
                         <div className="invfilter-label-col">
@@ -1024,6 +1214,9 @@ const InventoryFilter = () => {
                                         className={`invfilter-tile ${(filters[shortcut.type] || []).includes(shortcut.value) ? 'active' : ''}`}
                                         onClick={() => applyLocationShortcut(shortcut)}
                                         title={`${shortcut.type === 'country' ? 'Country' : shortcut.type === 'state' ? 'State' : 'City'}: ${shortcut.value}`}
+                                        data-drag-group="loc"
+                                        data-drag-value={`${shortcut.type}:${shortcut.value}`}
+                                        data-drag-selected={(filters[shortcut.type] || []).includes(shortcut.value)}
                                     >
                                         {shortcut.value}
                                     </button>
@@ -1270,7 +1463,13 @@ const InventoryFilter = () => {
 
                                 <div className="invfilter-symbol-grid">
                                     {KEY_SYMBOLS.map((symbol) => (
-                                        <label key={symbol} className="invfilter-symbol-check">
+                                        <label
+                                            key={symbol}
+                                            className="invfilter-symbol-check"
+                                            data-drag-group="symbols"
+                                            data-drag-value={symbol}
+                                            data-drag-selected={keySymbols.includes(symbol)}
+                                        >
                                             <input
                                                 type="checkbox"
                                                 checked={keySymbols.includes(symbol)}
@@ -1391,6 +1590,17 @@ const InventoryFilter = () => {
                     border: 1px solid var(--color-input-border);
                     border-radius: 6px;
                     overflow: hidden;
+                }
+
+                /* Drag-to-select: tiles never start a native text selection while sweeping */
+                .invfilter-panel [data-drag-group] {
+                    user-select: none;
+                    -webkit-user-select: none;
+                    touch-action: manipulation;
+                }
+
+                .invfilter-panel [data-drag-group]:active {
+                    cursor: grabbing;
                 }
 
                 .invfilter-row {
