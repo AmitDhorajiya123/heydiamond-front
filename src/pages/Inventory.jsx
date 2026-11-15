@@ -465,6 +465,8 @@ const Inventory = () => {
     // Search input stays empty; filters arrive via navigation state / sessionStorage
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+    // Format of the global search: all columns, stock number or report number
+    const [searchField, setSearchField] = useState('all');
     const [filters, setFilters] = useState(() => {
         // 1) Filters passed with navigate('/inventory', { state: { appliedFilters } })
         if (location.state?.appliedFilters && typeof location.state.appliedFilters === 'object') {
@@ -606,6 +608,12 @@ const Inventory = () => {
             // Search query (standard Laravel + Yajra compatible)
             if (debouncedSearchTerm) {
                 params.search = debouncedSearchTerm;
+
+                // Format-aware search (stock no / report no). The backend
+                // splits pasted fixed-width numbers into separate values.
+                if (searchField !== 'all') {
+                    params.search_field = searchField;
+                }
             }
 
             // Custom filters (multi-value arrays and single-value ranges/flags)
@@ -684,7 +692,7 @@ const Inventory = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, perPage, debouncedSearchTerm, filters, sortBy, sortOrder, showToast]);
+    }, [currentPage, perPage, debouncedSearchTerm, searchField, filters, sortBy, sortOrder, showToast]);
 
     useEffect(() => {
         fetchDiamonds();
@@ -761,6 +769,7 @@ const Inventory = () => {
         setFilters({});
         setSearchTerm('');
         setDebouncedSearchTerm('');
+        setSearchField('all');
         setCurrentPage(1);
         // Forget the selection kept for the filter page, otherwise
         // "Back to Filters" would bring back the cleared filters
@@ -1062,14 +1071,42 @@ const Inventory = () => {
             {/* Search and Filters Bar */}
             <div className="filters-bar inventory-toolbar">
                 <div className="inventory-toolbar-left">
-                    <div className="search-wrapper">
+                    <div className="search-wrapper inventory-search-wrapper">
+                        <select
+                            className="inventory-search-field"
+                            value={searchField}
+                            onChange={(e) => {
+                                setSearchField(e.target.value);
+                                setCurrentPage(1);
+                            }}
+                            aria-label="Search format"
+                            title="Choose which field the search value belongs to"
+                        >
+                            <option value="all">All Columns</option>
+                            <option value="stock_no">Stock No</option>
+                            <option value="report_no">Report No</option>
+                        </select>
                         <Search size={18} className="search-icon" />
                         <input
                             type="text"
-                            placeholder="Search all columns..."
+                            placeholder={
+                                searchField === 'stock_no'
+                                    ? 'Search stock no (6-digit)...'
+                                    : searchField === 'report_no'
+                                        ? 'Search report no (9-digit)...'
+                                        : 'Search all columns...'
+                            }
+                            title={
+                                searchField === 'stock_no'
+                                    ? 'Paste multiple 6-digit stock numbers together, e.g. 106263103431'
+                                    : searchField === 'report_no'
+                                        ? 'Paste multiple 9-digit report numbers together, e.g. 854644177854644171'
+                                        : undefined
+                            }
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="search-input"
+                            inputMode={searchField === 'all' ? 'text' : 'numeric'}
                         />
                     </div>
 

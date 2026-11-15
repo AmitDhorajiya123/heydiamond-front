@@ -464,6 +464,11 @@ const InventoryFilter = () => {
             return;
         }
 
+        if (group === 'sizes' && selected) {
+            // Dragging/clicking size tiles clears the manual From/To range
+            setSpecificWeight((prev) => (prev.min === '' && prev.max === '' ? prev : { min: '', max: '' }));
+        }
+
         setFilters((prev) => {
             const current = prev[group] || [];
             const exists = current.includes(value);
@@ -637,8 +642,19 @@ const InventoryFilter = () => {
         });
     };
 
+    /* Manual weight range input: it overrides the size tiles */
+    const updateSpecificWeight = (key, value) => {
+        setSpecificWeight((prev) => ({ ...prev, [key]: value }));
+        setFilters((prev) => (prev.sizes.length ? { ...prev, sizes: [] } : prev));
+    };
+
     /* Toggle a tile inside a group */
     const toggle = (group, value) => {
+        if (group === 'sizes') {
+            // Choosing a size tile clears the manual From/To range
+            setSpecificWeight((prev) => (prev.min === '' && prev.max === '' ? prev : { min: '', max: '' }));
+        }
+
         setFilters((prev) => {
             const current = prev[group] || [];
             const exists = current.includes(value);
@@ -711,8 +727,8 @@ const InventoryFilter = () => {
         /* Stock id / certificate number */
         if (stockId.trim()) appliedFilters.search = stockId.trim();
 
-        /* Weight */
-        if (sizeTab === 'specific') {
+        /* Weight: a manually typed From/To range takes priority over the size tiles */
+        if (specificWeight.min !== '' || specificWeight.max !== '') {
             if (specificWeight.min !== '') appliedFilters.weightMin = specificWeight.min;
             if (specificWeight.max !== '') appliedFilters.weightMax = specificWeight.max;
         } else if (filters.sizes.length) {
@@ -1000,21 +1016,45 @@ const InventoryFilter = () => {
                         </div>
                         <div className="invfilter-content">
                             {sizeTab === 'general' ? (
-                                <div className="invfilter-tilegroup">
-                                    {SIZE_OPTIONS.map((size) => (
-                                        <button
-                                            type="button"
-                                            key={size.label}
-                                            className={`invfilter-tile ${filters.sizes.includes(size.label) ? 'active' : ''}`}
-                                            onClick={() => toggle('sizes', size.label)}
-                                            data-drag-group="sizes"
-                                            data-drag-value={size.label}
-                                            data-drag-selected={filters.sizes.includes(size.label)}
-                                        >
-                                            {size.label}
-                                        </button>
-                                    ))}
-                                </div>
+                                <>
+                                    {/* Manual From/To weight range (overrides the tiles) */}
+                                    <div className="invfilter-range invfilter-size-manual">
+                                        <input
+                                            type="number"
+                                            className="invfilter-number"
+                                            placeholder="From (ct)"
+                                            step="0.01"
+                                            min="0"
+                                            value={specificWeight.min}
+                                            onChange={(e) => updateSpecificWeight('min', e.target.value)}
+                                        />
+                                        <span className="invfilter-range-to">to</span>
+                                        <input
+                                            type="number"
+                                            className="invfilter-number"
+                                            placeholder="To (ct)"
+                                            step="0.01"
+                                            min="0"
+                                            value={specificWeight.max}
+                                            onChange={(e) => updateSpecificWeight('max', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="invfilter-tilegroup">
+                                        {SIZE_OPTIONS.map((size) => (
+                                            <button
+                                                type="button"
+                                                key={size.label}
+                                                className={`invfilter-tile ${filters.sizes.includes(size.label) ? 'active' : ''}`}
+                                                onClick={() => toggle('sizes', size.label)}
+                                                data-drag-group="sizes"
+                                                data-drag-value={size.label}
+                                                data-drag-selected={filters.sizes.includes(size.label)}
+                                            >
+                                                {size.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
                             ) : (
                                 <div className="invfilter-range">
                                     <input
@@ -1024,7 +1064,7 @@ const InventoryFilter = () => {
                                         step="0.01"
                                         min="0"
                                         value={specificWeight.min}
-                                        onChange={(e) => setSpecificWeight((p) => ({ ...p, min: e.target.value }))}
+                                        onChange={(e) => updateSpecificWeight('min', e.target.value)}
                                     />
                                     <span className="invfilter-range-to">to</span>
                                     <input
@@ -1034,7 +1074,7 @@ const InventoryFilter = () => {
                                         step="0.01"
                                         min="0"
                                         value={specificWeight.max}
-                                        onChange={(e) => setSpecificWeight((p) => ({ ...p, max: e.target.value }))}
+                                        onChange={(e) => updateSpecificWeight('max', e.target.value)}
                                     />
                                 </div>
                             )}
@@ -1820,6 +1860,10 @@ const InventoryFilter = () => {
                     display: flex;
                     align-items: center;
                     gap: 10px;
+                }
+
+                .invfilter-size-manual {
+                    margin-bottom: 12px;
                 }
 
                 .invfilter-number {

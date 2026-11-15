@@ -67,10 +67,30 @@ const fmtPriceShort = (val) => {
     return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 };
 
+// Parse the stored measurement string (e.g. "9.80 * 9.85 * 5.97") into
+// [length, width, depth] in millimetres, with per-column fallbacks.
+const measurementParts = (diamond) => {
+    const raw = typeof diamond.measurements === 'string' ? diamond.measurements.trim() : '';
+    if (raw) {
+        const parts = raw.split(/\s*[*x×]\s*/i).map((p) => p.trim()).filter(Boolean);
+        if (parts.length >= 3) return parts.slice(0, 3);
+    }
+
+    return [diamond.length, diamond.width, diamond.height || diamond.depth]
+        .filter((v) => v !== null && v !== undefined && v !== '')
+        .map(String);
+};
+
+const fmtMm = (val) => {
+    if (val === null || val === undefined || val === '') return '–';
+    return `${val} mm`;
+};
+
 // ─── Ad Card (active slot) ───────────────────────────────────────────────────
 const FeaturedAdCard = ({ diamond, onRemove }) => {
     const [imgErr, setImgErr] = useState(false);
     const img = diamond.imageLink || diamond.assetImage || diamond.heartImage || null;
+    const [mLength, mWidth, mDepth] = measurementParts(diamond);
 
     return (
         <div className="featured-ad-card">
@@ -145,6 +165,20 @@ const FeaturedAdCard = ({ diamond, onRemove }) => {
                         { label: 'Polish', val: fmt(diamond.polish) },
                         { label: 'Sym', val: fmt(diamond.symmetry) },
                         { label: 'Fluor', val: fmt(diamond.fluorescenceIntensity) },
+                    ].map(({ label, val }) => (
+                        <div key={label} className="featured-ad-spec-item">
+                            <span className="featured-ad-spec-label">{label}</span>
+                            <span className="featured-ad-spec-val">{val}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Measurement row: Length, Width, Depth (mm) */}
+                <div className="featured-ad-specs-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 14 }}>
+                    {[
+                        { label: 'Length', val: fmtMm(mLength) },
+                        { label: 'Width', val: fmtMm(mWidth) },
+                        { label: 'Depth', val: fmtMm(mDepth) },
                     ].map(({ label, val }) => (
                         <div key={label} className="featured-ad-spec-item">
                             <span className="featured-ad-spec-label">{label}</span>
