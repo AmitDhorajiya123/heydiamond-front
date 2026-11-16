@@ -80,7 +80,7 @@ const ApiClientPage = () => {
     };
 
     const openEdit = (client) => {
-        setEditingId(client.id);
+        setEditingId(client.encrypted_id);
         setForm({
             name: client.name || '',
             url: client.url || '',
@@ -236,7 +236,7 @@ const ApiClientPage = () => {
 
         setDeleting(true);
         try {
-            await diamondApi.deleteApiClient(deleteTarget.id);
+            await diamondApi.deleteApiClient(deleteTarget.encrypted_id);
             showToast('API client deleted successfully.', 'success');
             setDeleteTarget(null);
             await loadApiClients();
@@ -273,7 +273,7 @@ const ApiClientPage = () => {
                         </thead>
                         <tbody>
                             {apiClients.map((client) => (
-                                <tr key={client.id}>
+                                <tr key={client.encrypted_id}>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <Globe size={14} />

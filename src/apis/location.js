@@ -7,9 +7,9 @@ export const locationApi = {
         return response.data;
     },
 
-    // Get single location by plain numeric ID (locations API uses plain IDs)
-    get: async (id) => {
-        const response = await api.get(`/locations/${id}`);
+    // Get single location by encrypted ID
+    get: async (encryptedId) => {
+        const response = await api.get(`/locations/${encodeURIComponent(encryptedId)}`);
         return response.data;
     },
 
@@ -19,15 +19,15 @@ export const locationApi = {
         return response.data;
     },
 
-    // Update location by plain numeric ID
-    update: async (id, data) => {
-        const response = await api.put(`/locations/${id}`, data);
+    // Update location by encrypted ID
+    update: async (encryptedId, data) => {
+        const response = await api.put(`/locations/${encodeURIComponent(encryptedId)}`, data);
         return response.data;
     },
 
-    // Delete location by plain numeric ID
-    remove: async (id) => {
-        const response = await api.delete(`/locations/${id}`);
+    // Delete location by encrypted ID
+    remove: async (encryptedId) => {
+        const response = await api.delete(`/locations/${encodeURIComponent(encryptedId)}`);
         return response.data;
     },
 };

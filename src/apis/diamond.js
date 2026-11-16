@@ -25,21 +25,27 @@ export const diamondApi = {
         return response.data;
     },
 
+    // Get single diamond by its encrypted ID (DNA page URL)
+    getByEncryptedId: async (encryptedId) => {
+        const response = await api.get(`/diamonds/${encodeURIComponent(encryptedId)}`);
+        return response.data;
+    },
+
     // Create new diamond
     create: async (data) => {
         const response = await api.post('/diamonds', data);
         return response.data;
     },
 
-    // Update diamond by ID
-    update: async (id, data) => {
-        const response = await api.put(`/diamonds/${id}`, data);
+    // Update diamond by encrypted ID
+    update: async (encryptedId, data) => {
+        const response = await api.put(`/diamonds/${encodeURIComponent(encryptedId)}`, data);
         return response.data;
     },
 
-    // Delete diamond by ID
-    remove: async (id) => {
-        const response = await api.delete(`/diamonds/${id}`);
+    // Delete diamond by encrypted ID
+    remove: async (encryptedId) => {
+        const response = await api.delete(`/diamonds/${encodeURIComponent(encryptedId)}`);
         return response.data;
     },
 
@@ -61,15 +67,15 @@ export const diamondApi = {
         return response.data;
     },
 
-    // Update an existing external API client
-    updateApiClient: async (id, data = {}) => {
-        const response = await api.put(`/diamonds/api-clients/${id}`, data);
+    // Update an existing external API client (encrypted ID)
+    updateApiClient: async (encryptedId, data = {}) => {
+        const response = await api.put(`/diamonds/api-clients/${encodeURIComponent(encryptedId)}`, data);
         return response.data;
     },
 
-    // Remove an external API client
-    deleteApiClient: async (id) => {
-        const response = await api.delete(`/diamonds/api-clients/${id}`);
+    // Remove an external API client (encrypted ID)
+    deleteApiClient: async (encryptedId) => {
+        const response = await api.delete(`/diamonds/api-clients/${encodeURIComponent(encryptedId)}`);
         return response.data;
     },
 };

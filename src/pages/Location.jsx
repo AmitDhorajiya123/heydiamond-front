@@ -9,8 +9,6 @@ const Location = () => (
             singular: 'Location',
             addButtonLabel: 'Add Location',
             displayField: 'location_code',
-            // Locations API uses plain numeric IDs (not encrypted)
-            idKey: 'location_id',
             api: locationApi,
             fields: [
                 { key: 'location_code', label: 'Code', required: true, maxLength: 10, mono: true, placeholder: 'Enter location code (e.g. INDIA)' },

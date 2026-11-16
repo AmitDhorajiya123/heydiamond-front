@@ -39,7 +39,7 @@ function App() {
               } />
 
               {/* Our own Diamond DNA / stone details page */}
-              <Route path="/inventory/dna/:id" element={
+              <Route path="/inventory/dna/:token" element={
                 <ProtectedRoute adminOnly><DiamondDNA /></ProtectedRoute>
               } />
 

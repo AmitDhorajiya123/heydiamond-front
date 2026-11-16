@@ -103,7 +103,7 @@ const FeaturedAdCard = ({ diamond, onRemove }) => {
                 <button
                     className="featured-ad-remove-btn"
                     title="Remove from featured"
-                    onClick={() => onRemove(diamond.id)}
+                    onClick={() => onRemove(diamond.encrypted_id)}
                 >
                     <X size={12} />
                 </button>
@@ -443,10 +443,10 @@ const DiamondSelectorModal = ({
                     {/* Diamond list */}
                     {!loading && diamonds.map((d) => (
                         <SelectorItem
-                            key={d.id}
+                            key={d.encrypted_id}
                             d={d}
                             img={d.imageLink || d.assetImage || null}
-                            alreadySelected={selectedIds.includes(d.id)}
+                            alreadySelected={selectedIds.includes(d.encrypted_id)}
                             maxReached={selectedIds.length >= MAX_ADS}
                             onSelect={onSelect}
                         />
@@ -650,21 +650,21 @@ const Dashboard = () => {
     // Handle add / remove inside modal
     const handleSelectorPick = (diamond, isRemove) => {
         if (isRemove) {
-            setFeaturedDiamonds((prev) => prev.filter((d) => d.id !== diamond.id));
+            setFeaturedDiamonds((prev) => prev.filter((d) => d.encrypted_id !== diamond.encrypted_id));
             return;
         }
         if (featuredDiamonds.length >= MAX_ADS) {
             showToast(`Maximum ${MAX_ADS} featured diamonds allowed`, 'warning');
             return;
         }
-        if (featuredDiamonds.find((d) => d.id === diamond.id)) return;
+        if (featuredDiamonds.find((d) => d.encrypted_id === diamond.encrypted_id)) return;
         setFeaturedDiamonds((prev) => [...prev, diamond]);
         showToast(`"${diamond.stockNo}" added to featured ads`, 'success');
     };
 
     // Remove directly from ad card × button
-    const handleRemoveAd = (id) => {
-        setFeaturedDiamonds((prev) => prev.filter((d) => d.id !== id));
+    const handleRemoveAd = (encryptedId) => {
+        setFeaturedDiamonds((prev) => prev.filter((d) => d.encrypted_id !== encryptedId));
         showToast('Diamond removed from featured ads', 'info');
     };
 
@@ -679,7 +679,7 @@ const Dashboard = () => {
         Icon: iconMap[key] || Package,
     }));
 
-    const selectedIds = featuredDiamonds.map((d) => d.id);
+    const selectedIds = featuredDiamonds.map((d) => d.encrypted_id);
 
     return (
         <Layout>
@@ -736,7 +736,7 @@ const Dashboard = () => {
                     {slots.map((diamond, idx) =>
                         diamond ? (
                             <FeaturedAdCard
-                                key={diamond.id}
+                                key={diamond.encrypted_id}
                                 diamond={diamond}
                                 onRemove={handleRemoveAd}
                             />

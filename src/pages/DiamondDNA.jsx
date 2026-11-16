@@ -117,7 +117,7 @@ const EmptyMedia = ({ text, icon }) => (
 );
 
 const DiamondDNA = () => {
-    const { id } = useParams();
+    const { token } = useParams();
     const navigate = useNavigate();
     const { showToast } = useToast();
 
@@ -136,7 +136,7 @@ const DiamondDNA = () => {
             setImageError(false);
 
             try {
-                const response = await diamondApi.get(id);
+                const response = await diamondApi.getByEncryptedId(token);
                 const payload = response?.data ?? response;
                 if (!cancelled) {
                     setDiamond(payload);
@@ -160,7 +160,7 @@ const DiamondDNA = () => {
         load();
 
         return () => { cancelled = true; };
-    }, [id]);
+    }, [token]);
 
     const goBack = () => {
         const historyIndex = window.history.state?.idx ?? 0;

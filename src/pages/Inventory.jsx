@@ -29,49 +29,6 @@ import Pagination from '../components/Pagination';
 import diamondApi from '../apis/diamond';
 import { useToast } from '../context/ToastContext';
 
-// Resolve the markup % for a diamond from its API client's price-range slabs.
-// Ranges are based on $/ct; the matched % is applied to both $/ct and Total $.
-const resolveMarkupPercent = (apiClient, diamond) => {
-    if (!apiClient) return 0;
-
-    const fallback = Number(apiClient.markup || 0);
-    const ranges = Array.isArray(apiClient.markups) ? apiClient.markups : [];
-
-    if (!ranges.length) return fallback;
-
-    const rawValue = diamond.pricePerCt;
-    const value = Number(rawValue);
-
-    if (rawValue === null || rawValue === undefined || rawValue === '' || !Number.isFinite(value)) {
-        return fallback;
-    }
-
-    const sorted = ranges
-        .map((range) => ({
-            min: Number(range.min_value),
-            max: range.max_value === null || range.max_value === undefined || range.max_value === ''
-                ? null
-                : Number(range.max_value),
-            markup: Number(range.markup),
-        }))
-        .filter((range) => Number.isFinite(range.min) && Number.isFinite(range.markup))
-        .sort((a, b) => a.min - b.min);
-
-    let matched = sorted.find((range) => (
-        value >= range.min && (range.max === null || value <= range.max)
-    ));
-
-    // Decimal prices can fall between integer tiers (e.g. 100.50 between
-    // 0-100 and 101-200). In that case keep the highest tier whose From <= value.
-    if (!matched) {
-        for (const range of sorted) {
-            if (value >= range.min) matched = range;
-        }
-    }
-
-    return matched ? matched.markup : fallback;
-};
-
 // Media Preview Modal Component
 const MediaPreviewModal = ({ isOpen, onClose, media }) => {
     if (!isOpen || !media) return null;
@@ -404,7 +361,15 @@ const FILTER_FORM_KEY = 'hd_inventory_filters';
 const loadAppliedFilters = () => {
     try {
         const raw = sessionStorage.getItem(APPLIED_FILTERS_KEY);
-        return raw ? JSON.parse(raw) : null;
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+
+        // The API source filter is now sent as an encrypted id. Drop any
+        // legacy numeric id that may still be stored in an old session.
+        delete parsed.api_client_id;
+        return parsed;
     } catch (error) {
         return null;
     }
@@ -513,7 +478,9 @@ const Inventory = () => {
     const [filters, setFilters] = useState(() => {
         // 1) Filters passed with navigate('/inventory', { state: { appliedFilters } })
         if (location.state?.appliedFilters && typeof location.state.appliedFilters === 'object') {
-            return location.state.appliedFilters;
+            const next = { ...location.state.appliedFilters };
+            delete next.api_client_id;
+            return next;
         }
 
         // 2) Filters kept for this tab (survives refresh)
@@ -751,7 +718,7 @@ const Inventory = () => {
         setSyncing(true);
         try {
             // If a specific API is selected in the dropdown, sync that one; otherwise sync all
-            const payload = apiFilterId ? { api_client_id: apiFilterId } : {};
+            const payload = apiFilterId ? { api_client_encrypted_id: apiFilterId } : {};
             const response = await diamondApi.sync(payload);
             if (response.success) {
                 showToast(response.message || 'Diamonds synced successfully!', 'success');
@@ -773,17 +740,17 @@ const Inventory = () => {
     const handleApiDone = () => {
         setCurrentPage(1);
         if (!apiFilterId) {
-            // "All APIs" selected -> remove api_client_id filter
+            // "All APIs" selected -> remove the API client filter
             setFilters((prev) => {
                 const next = { ...prev };
-                delete next.api_client_id;
+                delete next.api_client_encrypted_id;
                 return next;
             });
         } else {
-            // Specific API selected -> filter table by this api_client_id
+            // Specific API selected -> filter table by the encrypted API client ID
             setFilters((prev) => ({
                 ...prev,
-                api_client_id: apiFilterId
+                api_client_encrypted_id: apiFilterId
             }));
         }
     };
@@ -858,7 +825,7 @@ const Inventory = () => {
         setDeleteConfirm(prev => ({ ...prev, loading: true }));
 
         try {
-            const response = await diamondApi.remove(diamond.id);
+            const response = await diamondApi.remove(diamond.encrypted_id);
             if (response.success) {
                 showToast(response.message || 'Diamond deleted successfully', 'success');
                 handleCloseDeleteConfirm();
@@ -920,11 +887,8 @@ const Inventory = () => {
 
         // API source name (from the DB api_clients table)
         if (column.key === 'apiName') {
-            const apiClient = apiClients.find(
-                (client) => String(client.id) === String(diamond.api_client_id)
-            );
-            return apiClient
-                ? <span>{apiClient.name}</span>
+            return diamond.api_client_name
+                ? <span>{diamond.api_client_name}</span>
                 : <span style={{ color: 'var(--color-text-light)' }}>-</span>;
         }
 
@@ -938,10 +902,7 @@ const Inventory = () => {
                 return <span style={{ color: 'var(--color-text-light)' }}>-</span>;
             }
 
-            const apiClient = apiClients.find(
-                (client) => String(client.id) === String(diamond.api_client_id)
-            );
-            const markup = resolveMarkupPercent(apiClient, diamond);
+            const markup = Number(diamond.markup_percent ?? 0);
             const markedUp = Number(base) * (1 + markup / 100);
 
             return (
@@ -1063,10 +1024,15 @@ const Inventory = () => {
                         {value}
                     </span>
                 );
-            case 'DNA':
+            case 'DNA': {
+                // Use the encrypted ID so the real database ID never appears in the URL.
+                const dnaToken = diamond.encrypted_id;
+                if (!dnaToken) {
+                    return <span style={{ color: 'var(--color-text-light)' }}>-</span>;
+                }
                 return (
                     <a
-                        href={`/inventory/dna/${diamond.id}`}
+                        href={`/inventory/dna/${encodeURIComponent(dnaToken)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="dna-view-link"
@@ -1076,6 +1042,7 @@ const Inventory = () => {
                         <span>View DNA</span>
                     </a>
                 );
+            }
             default:
                 return <span title={String(value)}>{String(value).length > 35 ? String(value).substring(0, 35) + '...' : String(value)}</span>;
         }
@@ -1163,7 +1130,7 @@ const Inventory = () => {
                         >
                             <option value="">All APIs</option>
                             {apiClients.map((client) => (
-                                <option key={client.id} value={client.id}>{client.name}</option>
+                                <option key={client.encrypted_id} value={client.encrypted_id}>{client.name}</option>
                             ))}
                         </select>
                         <button
@@ -1274,7 +1241,7 @@ const Inventory = () => {
                                 )
                             ) : (
                                 diamonds.map((diamond, index) => (
-                                    <tr key={diamond.id}>
+                                    <tr key={diamond.encrypted_id}>
                                         {allColumns
                                             .filter(col => visibleColumns.includes(col.key) || col.required)
                                             .map((column) => (
