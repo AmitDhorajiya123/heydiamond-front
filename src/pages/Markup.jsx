@@ -65,6 +65,53 @@ const sanitizeDecimalInput = (value) => {
     return next;
 };
 
+// Percentages are capped at 100 so a typo can never produce an invalid markup.
+const MAX_MARKUP_PERCENT = 100;
+
+const sanitizePercentageInput = (value) => {
+    const clean = sanitizeDecimalInput(value);
+
+    if (clean === '') return '';
+
+    const number = Number(clean);
+    if (Number.isFinite(number) && number > MAX_MARKUP_PERCENT) {
+        return String(MAX_MARKUP_PERCENT);
+    }
+
+    return clean;
+};
+
+const hasRangeValue = (range) => (
+    [range.min_value, range.max_value, range.markup]
+        .some((value) => value !== '' && value !== null && value !== undefined)
+);
+
+const rangeMarkupError = (range, index) => {
+    if (!hasRangeValue(range)) {
+        return null;
+    }
+
+    const min = parseOptionalNumber(range.min_value);
+    const max = parseOptionalNumber(range.max_value);
+    const markup = parseOptionalNumber(range.markup);
+
+    // Blank fields are optional and fall back to sensible defaults.
+    if (min !== null && (Number.isNaN(min) || min < 0)) {
+        return `Range ${index + 1}: enter a valid "From" value.`;
+    }
+    if (max !== null && (Number.isNaN(max) || max < min || (min === null && max < 0))) {
+        return `Range ${index + 1}: "To" must be greater than or equal to "From".`;
+    }
+    if (markup !== null && (Number.isNaN(markup) || markup < 0)) {
+        return `Range ${index + 1}: enter a valid markup %.`;
+    }
+    if (markup !== null && markup > MAX_MARKUP_PERCENT) {
+        return `Range ${index + 1}: markup cannot exceed ${MAX_MARKUP_PERCENT}%.`;
+    }
+
+    return null;
+};
+
 const MarkupPage = () => {
     const { showToast } = useToast();
 
@@ -277,27 +324,37 @@ const MarkupPage = () => {
             setFormError('Default markup must be a valid percentage (0 or more).');
             return;
         }
+        if (markup > MAX_MARKUP_PERCENT) {
+            setFormError(`Default markup cannot exceed ${MAX_MARKUP_PERCENT}%.`);
+            return;
+        }
 
         // Validate every range before sending it to the backend.
         let ranges = [];
         try {
-            ranges = form.markups.map((range, index) => {
-                const min = parseOptionalNumber(range.min_value);
-                const max = parseOptionalNumber(range.max_value);
-                const rangeMarkup = parseOptionalNumber(range.markup);
+            ranges = form.markups
+                .map((range, index) => {
+                    // Empty rows are optional: skip them instead of showing an error.
+                    if (!hasRangeValue(range)) {
+                        return null;
+                    }
 
-                if (min === null || Number.isNaN(min) || min < 0) {
-                    throw new Error(`Range ${index + 1}: enter a valid "From" value.`);
-                }
-                if (max !== null && (Number.isNaN(max) || max < min)) {
-                    throw new Error(`Range ${index + 1}: "To" must be greater than or equal to "From".`);
-                }
-                if (rangeMarkup === null || Number.isNaN(rangeMarkup) || rangeMarkup < 0) {
-                    throw new Error(`Range ${index + 1}: enter a valid markup %.`);
-                }
+                    const error = rangeMarkupError(range, index);
 
-                return { min, max, markup: rangeMarkup };
-            });
+                    if (error) {
+                        throw new Error(error);
+                    }
+
+                    const min = parseOptionalNumber(range.min_value);
+                    const markup = parseOptionalNumber(range.markup);
+
+                    return {
+                        min: min === null ? 0 : min,
+                        max: parseOptionalNumber(range.max_value),
+                        markup: markup === null ? 0 : markup,
+                    };
+                })
+                .filter(Boolean);
         } catch (err) {
             setFormError(err.message);
             return;
@@ -543,16 +600,16 @@ const MarkupPage = () => {
                                         <div className="form-group">
                                             <label className="form-label">Default Markup (%)</label>
                                             <input
-                                                className="form-input"
+                                                className={`form-input ${Number(form.markup) > MAX_MARKUP_PERCENT ? 'invalid-percent' : ''}`}
                                                 type="text"
                                                 inputMode="decimal"
                                                 value={form.markup}
-                                                onChange={(e) => setForm((prev) => ({ ...prev, markup: sanitizeDecimalInput(e.target.value) }))}
+                                                onChange={(e) => setForm((prev) => ({ ...prev, markup: sanitizePercentageInput(e.target.value) }))}
                                                 placeholder="0.00"
                                                 disabled={saving || customerLoading}
                                             />
                                             <p className="form-help">
-                                                Used when a diamond&apos;s $/ct does not match any range below.
+                                                Used when a diamond&apos;s $/ct does not match any range below. Maximum {MAX_MARKUP_PERCENT}%.
                                             </p>
                                         </div>
 
@@ -595,46 +652,55 @@ const MarkupPage = () => {
                                                         <span>Markup (%)</span>
                                                         <span />
                                                     </div>
-                                                    {form.markups.map((range, index) => (
-                                                        <div className="markup-range-row" key={index}>
-                                                            <input
-                                                                className="form-input"
-                                                                type="text"
-                                                                inputMode="decimal"
-                                                                value={range.min_value}
-                                                                onChange={(e) => updateRange(index, 'min_value', sanitizeDecimalInput(e.target.value))}
-                                                                placeholder="0"
-                                                                disabled={saving || customerLoading}
-                                                            />
-                                                            <input
-                                                                className="form-input"
-                                                                type="text"
-                                                                inputMode="decimal"
-                                                                value={range.max_value}
-                                                                onChange={(e) => updateRange(index, 'max_value', sanitizeDecimalInput(e.target.value))}
-                                                                placeholder="All"
-                                                                disabled={saving || customerLoading}
-                                                            />
-                                                            <input
-                                                                className="form-input"
-                                                                type="text"
-                                                                inputMode="decimal"
-                                                                value={range.markup}
-                                                                onChange={(e) => updateRange(index, 'markup', sanitizeDecimalInput(e.target.value))}
-                                                                placeholder="0.00"
-                                                                disabled={saving || customerLoading}
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                className="markup-range-remove"
-                                                                onClick={() => removeRange(index)}
-                                                                title="Remove range"
-                                                                disabled={saving || customerLoading}
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </div>
-                                                    ))}
+                                                    {form.markups.map((range, index) => {
+                                                        const rowError = rangeMarkupError(range, index);
+
+                                                        return (
+                                                            <div className={`markup-range-item ${rowError ? 'invalid' : ''}`} key={index}>
+                                                                <div className="markup-range-row">
+                                                                    <input
+                                                                        className="form-input"
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={range.min_value}
+                                                                        onChange={(e) => updateRange(index, 'min_value', sanitizeDecimalInput(e.target.value))}
+                                                                        placeholder="0"
+                                                                        disabled={saving || customerLoading}
+                                                                    />
+                                                                    <input
+                                                                        className="form-input"
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={range.max_value}
+                                                                        onChange={(e) => updateRange(index, 'max_value', sanitizeDecimalInput(e.target.value))}
+                                                                        placeholder="All"
+                                                                        disabled={saving || customerLoading}
+                                                                    />
+                                                                    <input
+                                                                        className="form-input"
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={range.markup}
+                                                                        onChange={(e) => updateRange(index, 'markup', sanitizePercentageInput(e.target.value))}
+                                                                        placeholder="0.00"
+                                                                        disabled={saving || customerLoading}
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        className="markup-range-remove"
+                                                                        onClick={() => removeRange(index)}
+                                                                        title="Remove range"
+                                                                        disabled={saving || customerLoading}
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                                {rowError && (
+                                                                    <p className="markup-range-error">{rowError}</p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <p className="markup-ranges-empty">

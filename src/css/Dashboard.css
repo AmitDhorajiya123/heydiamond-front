@@ -1162,6 +1162,27 @@ select.form-input {
     border-color: #e9bdb9;
 }
 
+.markup-range-item + .markup-range-item {
+    margin-top: 8px;
+}
+
+.markup-range-item.invalid .form-input {
+    border-color: #d93025;
+    background: #fff6f5;
+}
+
+.markup-range-error {
+    margin: 4px 2px 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: #d93025;
+}
+
+.form-input.invalid-percent {
+    border-color: #d93025;
+    background: #fff6f5;
+}
+
 .markup-ranges-empty {
     margin: 0;
     padding: 12px;
