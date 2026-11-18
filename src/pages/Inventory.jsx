@@ -27,6 +27,7 @@ import {
 import Layout from '../components/Layout';
 import Pagination from '../components/Pagination';
 import diamondApi from '../apis/diamond';
+import CustomerSearchSelect from '../components/CustomerSearchSelect';
 import { useToast } from '../context/ToastContext';
 
 // Media Preview Modal Component
@@ -469,6 +470,8 @@ const Inventory = () => {
     const [apiClients, setApiClients] = useState([]);
     const [apiLoading, setApiLoading] = useState(false);
     const [apiFilterId, setApiFilterId] = useState('');
+    const [customerFilterId, setCustomerFilterId] = useState('');
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
 
     // Search input stays empty; filters arrive via navigation state / sessionStorage
     const [searchTerm, setSearchTerm] = useState('');
@@ -640,6 +643,12 @@ const Inventory = () => {
                 }
             });
 
+            // Customer markup preview: this does not filter the rows, it only
+            // changes the markup % applied to $/ct and Total $.
+            if (customerFilterId) {
+                params.customer_encrypted_id = customerFilterId;
+            }
+
             const response = await diamondApi.search(params, { signal: controller.signal });
 
             // Extract the payload (handles direct Yajra response or wrapped { success: true, data: { ... } })
@@ -702,7 +711,7 @@ const Inventory = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, perPage, debouncedSearchTerm, searchField, filters, sortBy, sortOrder, showToast]);
+    }, [currentPage, perPage, debouncedSearchTerm, searchField, filters, sortBy, sortOrder, customerFilterId, showToast]);
 
     useEffect(() => {
         fetchDiamonds();
@@ -780,6 +789,9 @@ const Inventory = () => {
         setSearchTerm('');
         setDebouncedSearchTerm('');
         setSearchField('all');
+        setApiFilterId('');
+        setCustomerFilterId('');
+        setSelectedCustomer(null);
         setCurrentPage(1);
         // Forget the selection kept for the filter page, otherwise
         // "Back to Filters" would bring back the cleared filters
@@ -1140,6 +1152,19 @@ const Inventory = () => {
                         >
                             Done
                         </button>
+                        <div style={{ width: '220px' }} title="Preview markup for a customer">
+                            <CustomerSearchSelect
+                                selectedCustomer={selectedCustomer}
+                                onChange={(customer) => {
+                                    setSelectedCustomer(customer);
+                                    setCustomerFilterId(customer ? customer.encrypted_id : '');
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="All Customers"
+                                allowClear
+                                disabled={loading}
+                            />
+                        </div>
                     </div>
 
                     <div className="inventory-per-page">

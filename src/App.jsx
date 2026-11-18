@@ -11,6 +11,7 @@ import Inventory from './pages/Inventory';
 import InventoryFilter from './pages/InventoryFilter';
 import DiamondDNA from './pages/DiamondDNA';
 import ApiClient from './pages/ApiClient';
+import Markup from './pages/Markup';
 
 function App() {
   return (
@@ -46,6 +47,11 @@ function App() {
               {/* API / FTP Client - custom API data listing */}
               <Route path="/api-client" element={
                 <ProtectedRoute adminOnly><ApiClient /></ProtectedRoute>
+              } />
+
+              {/* Customer Markup page - global markup ranges per customer */}
+              <Route path="/markup" element={
+                <ProtectedRoute adminOnly><Markup /></ProtectedRoute>
               } />
 
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

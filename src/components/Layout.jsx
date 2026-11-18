@@ -14,7 +14,8 @@ import {
     Search,
     Gem,
     RefreshCw,
-    Globe
+    Globe,
+    Percent
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -81,6 +82,12 @@ const Layout = ({ children }) => {
                         <Link to="/api-client" className={`nav-item ${isActive('/api-client') ? 'active' : ''}`} title="API / FTP Client">
                             <Globe size={20} />
                             <span>API / FTP Client</span>
+                        </Link>
+                    )}
+                    {isAdmin && (
+                        <Link to="/markup" className={`nav-item ${isActive('/markup') ? 'active' : ''}`} title="Customer Markup">
+                            <Percent size={20} />
+                            <span>Markup</span>
                         </Link>
                     )}
                 </nav>
