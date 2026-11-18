@@ -146,6 +146,19 @@ const SIZE_OPTIONS = [
     { label: '10ct +', min: 10.00, max: null },
 ];
 
+/* Maximum number of manual From/To size ranges a user can add */
+const MAX_SIZE_RANGES = 8;
+
+/* Keep only digits and a single decimal point so "0.50" survives typing */
+const sanitizeDecimalInput = (value) => {
+    const cleaned = String(value).replace(/[^0-9.]/g, '');
+    const firstDot = cleaned.indexOf('.');
+
+    if (firstDot === -1) return cleaned;
+
+    return cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+};
+
 const emptyFilters = {
     shapes: [],
     colors: [],
@@ -409,7 +422,31 @@ const InventoryFilter = () => {
     const [noBlack, setNoBlack] = useState(() => Boolean(initialState.noBlack));
     const [sizeTab, setSizeTab] = useState(() => initialState.sizeTab || 'general');
     const [finishTab, setFinishTab] = useState(() => initialState.finishTab || 'general');
-    const [specificWeight, setSpecificWeight] = useState(() => initialState.specificWeight || { min: '', max: '' });
+    const [sizeRanges, setSizeRanges] = useState(() => {
+        const savedRanges = Array.isArray(initialState.sizeRanges) ? initialState.sizeRanges : null;
+
+        if (savedRanges && savedRanges.length) {
+            return savedRanges.slice(0, MAX_SIZE_RANGES).map((range) => ({
+                min: range?.min ?? '',
+                max: range?.max ?? '',
+            }));
+        }
+
+        // Backward compatibility: older saved state stored a single range.
+        const legacy = initialState.specificWeight;
+        if (legacy && (legacy.min !== '' || legacy.max !== '')) {
+            return [{ min: legacy.min ?? '', max: legacy.max ?? '' }];
+        }
+
+        return [{ min: '', max: '' }];
+    });
+    const [sizeRangeError, setSizeRangeError] = useState('');
+    const invalidSizeRangeIndex = sizeRanges.findIndex((range) => {
+        if (range.min === '' || range.max === '') return false;
+        const min = parseFloat(range.min);
+        const max = parseFloat(range.max);
+        return !Number.isNaN(min) && !Number.isNaN(max) && min > max;
+    });
     const [advanceOpen, setAdvanceOpen] = useState(() => Boolean(initialState.advanceOpen));
     const [adv, setAdv] = useState(() => ({ ...emptyAdvance, ...(initialState.adv || {}) }));
     const [symbolsOpen, setSymbolsOpen] = useState(() => Boolean(initialState.symbolsOpen));
@@ -423,6 +460,41 @@ const InventoryFilter = () => {
     /* ------------------------------------------------------------------ */
     const dragStateRef = useRef(null);
     const suppressClickRef = useRef(false);
+
+    const clearSizeRanges = () => {
+        setSizeRanges((prev) => (
+            prev.length === 1 && prev[0].min === '' && prev[0].max === ''
+                ? prev
+                : [{ min: '', max: '' }]
+        ));
+        setSizeRangeError('');
+    };
+
+    /* Manual weight ranges (up to 8): they override the size tiles */
+    const updateSizeRange = (index, key, value) => {
+        const sanitized = sanitizeDecimalInput(value);
+
+        setSizeRanges((prev) => prev.map((range, i) => (
+            i === index ? { ...range, [key]: sanitized } : range
+        )));
+        setFilters((prev) => (prev.sizes.length ? { ...prev, sizes: [] } : prev));
+        setSizeRangeError('');
+    };
+
+    const addSizeRange = () => {
+        setSizeRanges((prev) => (
+            prev.length >= MAX_SIZE_RANGES ? prev : [...prev, { min: '', max: '' }]
+        ));
+        setSizeRangeError('');
+    };
+
+    const removeSizeRange = (index) => {
+        setSizeRanges((prev) => {
+            if (prev.length <= 1) return [{ min: '', max: '' }];
+            return prev.filter((_, i) => i !== index);
+        });
+        setSizeRangeError('');
+    };
 
     const setTileSelection = (group, value, selected) => {
         if (group.startsWith('adv:')) {
@@ -465,8 +537,8 @@ const InventoryFilter = () => {
         }
 
         if (group === 'sizes' && selected) {
-            // Dragging/clicking size tiles clears the manual From/To range
-            setSpecificWeight((prev) => (prev.min === '' && prev.max === '' ? prev : { min: '', max: '' }));
+            // Dragging/clicking size tiles clears the manual From/To ranges
+            clearSizeRanges();
         }
 
         setFilters((prev) => {
@@ -642,17 +714,11 @@ const InventoryFilter = () => {
         });
     };
 
-    /* Manual weight range input: it overrides the size tiles */
-    const updateSpecificWeight = (key, value) => {
-        setSpecificWeight((prev) => ({ ...prev, [key]: value }));
-        setFilters((prev) => (prev.sizes.length ? { ...prev, sizes: [] } : prev));
-    };
-
     /* Toggle a tile inside a group */
     const toggle = (group, value) => {
         if (group === 'sizes') {
-            // Choosing a size tile clears the manual From/To range
-            setSpecificWeight((prev) => (prev.min === '' && prev.max === '' ? prev : { min: '', max: '' }));
+            // Choosing a size tile clears the manual From/To ranges
+            clearSizeRanges();
         }
 
         setFilters((prev) => {
@@ -698,7 +764,8 @@ const InventoryFilter = () => {
         setFlags({ available: false, newStone: false, offer: false, upcoming: false });
         setNoBgm(false);
         setNoBlack(false);
-        setSpecificWeight({ min: '', max: '' });
+        setSizeRanges([{ min: '', max: '' }]);
+        setSizeRangeError('');
         setAdv(emptyAdvance);
         setKeySymbols([]);
         setKeySymbolMode('contains');
@@ -706,6 +773,14 @@ const InventoryFilter = () => {
     };
 
     const handleSearch = () => {
+        // Validate the manual size ranges before building the payload.
+        if (invalidSizeRangeIndex !== -1) {
+            setSizeRangeError(`Range ${invalidSizeRangeIndex + 1}: From must be less than or equal to To.`);
+            return;
+        }
+
+        setSizeRangeError('');
+
         /* Payload for the API - sent in the POST body, never in the URL */
         const appliedFilters = {};
 
@@ -727,10 +802,16 @@ const InventoryFilter = () => {
         /* Stock id / certificate number */
         if (stockId.trim()) appliedFilters.search = stockId.trim();
 
-        /* Weight: a manually typed From/To range takes priority over the size tiles */
-        if (specificWeight.min !== '' || specificWeight.max !== '') {
-            if (specificWeight.min !== '') appliedFilters.weightMin = specificWeight.min;
-            if (specificWeight.max !== '') appliedFilters.weightMax = specificWeight.max;
+        /* Weight: manual From/To ranges (up to 8) take priority over the size tiles */
+        const normalizedSizeRanges = sizeRanges
+            .map((range) => ({
+                min: range.min !== '' ? range.min : null,
+                max: range.max !== '' ? range.max : null,
+            }))
+            .filter((range) => range.min !== null || range.max !== null);
+
+        if (normalizedSizeRanges.length) {
+            appliedFilters.sizeRanges = normalizedSizeRanges;
         } else if (filters.sizes.length) {
             const selected = SIZE_OPTIONS.filter((o) => filters.sizes.includes(o.label));
             const mins = selected.map((o) => o.min);
@@ -795,7 +876,7 @@ const InventoryFilter = () => {
                 noBlack,
                 sizeTab,
                 finishTab,
-                specificWeight,
+                sizeRanges,
                 adv,
                 keySymbolMode,
                 keySymbols,
@@ -809,6 +890,69 @@ const InventoryFilter = () => {
 
         navigate('/inventory', { state: { appliedFilters } });
     };
+
+    /* Manual From/To size ranges (up to 8). Any matching range is enough. */
+    const renderSizeRanges = () => (
+        <div className="invfilter-size-ranges">
+            {sizeRanges.map((range, index) => (
+                <div
+                    className={`invfilter-range invfilter-size-range-row${invalidSizeRangeIndex === index ? ' invfilter-size-range-row-invalid' : ''}`}
+                    key={index}
+                >
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="invfilter-number"
+                        placeholder={index === 0 ? 'From (ct)' : `From ${index + 1} (ct)`}
+                        value={range.min}
+                        onChange={(e) => updateSizeRange(index, 'min', e.target.value)}
+                    />
+                    <span className="invfilter-range-to">to</span>
+                    <input
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        className="invfilter-number"
+                        placeholder={index === 0 ? 'To (ct)' : `To ${index + 1} (ct)`}
+                        value={range.max}
+                        onChange={(e) => updateSizeRange(index, 'max', e.target.value)}
+                    />
+                    {sizeRanges.length > 1 && (
+                        <button
+                            type="button"
+                            className="invfilter-size-remove"
+                            onClick={() => removeSizeRange(index)}
+                            title="Remove this range"
+                            aria-label="Remove this range"
+                        >
+                            ×
+                        </button>
+                    )}
+                </div>
+            ))}
+
+            <div className="invfilter-size-actions">
+                <button
+                    type="button"
+                    className="invfilter-size-add"
+                    onClick={addSizeRange}
+                    disabled={sizeRanges.length >= MAX_SIZE_RANGES}
+                >
+                    + Add range
+                </button>
+                <span className="invfilter-size-hint">
+                    {sizeRanges.length}/{MAX_SIZE_RANGES} ranges
+                </span>
+            </div>
+
+            {(sizeRangeError || invalidSizeRangeIndex !== -1) && (
+                <div className="invfilter-size-error">
+                    {sizeRangeError || `Range ${invalidSizeRangeIndex + 1}: From must be less than or equal to To.`}
+                </div>
+            )}
+        </div>
+    );
 
     /* Renders a group of small square tiles */
     const renderTiles = (group, values) => (
@@ -1017,28 +1161,8 @@ const InventoryFilter = () => {
                         <div className="invfilter-content">
                             {sizeTab === 'general' ? (
                                 <>
-                                    {/* Manual From/To weight range (overrides the tiles) */}
-                                    <div className="invfilter-range invfilter-size-manual">
-                                        <input
-                                            type="number"
-                                            className="invfilter-number"
-                                            placeholder="From (ct)"
-                                            step="0.01"
-                                            min="0"
-                                            value={specificWeight.min}
-                                            onChange={(e) => updateSpecificWeight('min', e.target.value)}
-                                        />
-                                        <span className="invfilter-range-to">to</span>
-                                        <input
-                                            type="number"
-                                            className="invfilter-number"
-                                            placeholder="To (ct)"
-                                            step="0.01"
-                                            min="0"
-                                            value={specificWeight.max}
-                                            onChange={(e) => updateSpecificWeight('max', e.target.value)}
-                                        />
-                                    </div>
+                                    {/* Manual From/To ranges (override the tiles) */}
+                                    {renderSizeRanges()}
                                     <div className="invfilter-tilegroup">
                                         {SIZE_OPTIONS.map((size) => (
                                             <button
@@ -1056,27 +1180,7 @@ const InventoryFilter = () => {
                                     </div>
                                 </>
                             ) : (
-                                <div className="invfilter-range">
-                                    <input
-                                        type="number"
-                                        className="invfilter-number"
-                                        placeholder="Min ct"
-                                        step="0.01"
-                                        min="0"
-                                        value={specificWeight.min}
-                                        onChange={(e) => updateSpecificWeight('min', e.target.value)}
-                                    />
-                                    <span className="invfilter-range-to">to</span>
-                                    <input
-                                        type="number"
-                                        className="invfilter-number"
-                                        placeholder="Max ct"
-                                        step="0.01"
-                                        min="0"
-                                        value={specificWeight.max}
-                                        onChange={(e) => updateSpecificWeight('max', e.target.value)}
-                                    />
-                                </div>
+                                renderSizeRanges()
                             )}
                         </div>
                     </div>
@@ -1864,6 +1968,86 @@ const InventoryFilter = () => {
 
                 .invfilter-size-manual {
                     margin-bottom: 12px;
+                }
+
+                .invfilter-size-ranges {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                    margin-bottom: 12px;
+                }
+
+                .invfilter-size-range-row {
+                    flex-wrap: wrap;
+                }
+
+                .invfilter-size-range-row-invalid .invfilter-number {
+                    border-color: #b42318;
+                    background: #fff6f5;
+                }
+
+                .invfilter-size-remove {
+                    width: 30px;
+                    height: 30px;
+                    border: 1px solid #cdc6bf;
+                    border-radius: 50%;
+                    background: #fff;
+                    color: #8a6d4f;
+                    font-size: 18px;
+                    line-height: 1;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.15s ease;
+                }
+
+                .invfilter-size-remove:hover {
+                    border-color: var(--color-primary);
+                    color: var(--color-primary);
+                    background: #faf6f1;
+                }
+
+                .invfilter-size-actions {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+
+                .invfilter-size-add {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 7px 14px;
+                    border: 1px dashed var(--color-primary);
+                    border-radius: 4px;
+                    background: #fff;
+                    color: var(--color-primary);
+                    font-family: inherit;
+                    font-size: 13px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+
+                .invfilter-size-add:hover:not(:disabled) {
+                    background: #faf6f1;
+                }
+
+                .invfilter-size-add:disabled {
+                    border-color: #cdc6bf;
+                    color: #a9a19a;
+                    cursor: not-allowed;
+                }
+
+                .invfilter-size-hint {
+                    font-size: 12px;
+                    color: var(--color-text-light);
+                }
+
+                .invfilter-size-error {
+                    font-size: 12.5px;
+                    color: #b42318;
                 }
 
                 .invfilter-number {
