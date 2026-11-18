@@ -920,6 +920,11 @@ const Inventory = () => {
             return (
                 <span style={{ fontFamily: 'monospace', fontWeight: 500 }}>
                     {formatCurrency(markedUp)}
+                    {markup > 0 && (
+                        <span className="markup-plus-badge" title={`Markup +${markup.toFixed(2)}%`}>
+                            {`+${markup.toFixed(2)}%`}
+                        </span>
+                    )}
                 </span>
             );
         }

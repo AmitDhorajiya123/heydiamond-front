@@ -1118,7 +1118,7 @@ select.form-input {
 .markup-range-labels,
 .markup-range-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 34px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 34px;
     gap: 8px;
     align-items: center;
 }
@@ -1708,6 +1708,19 @@ select.form-input {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+}
+
+.markup-plus-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #f3ece4;
+    color: var(--color-primary-hover);
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .status-available {

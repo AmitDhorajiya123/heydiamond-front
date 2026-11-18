@@ -23,6 +23,7 @@ import {
 import Layout from '../components/Layout';
 import dashboardApi from '../apis/dashboard';
 import diamondApi from '../apis/diamond';
+import featuredAdsApi from '../apis/featuredAds';
 import { useToast } from '../context/ToastContext';
 
 const iconMap = {
@@ -52,7 +53,27 @@ const labelMap = {
 };
 
 const MAX_ADS = 3;
-const LS_KEY = 'hd_featured_diamond_ads';
+
+// Prefer the certificate verification URL stored on the diamond record.
+// Older rows without that link fall back to a lab-specific report lookup.
+const reportUrlFor = (diamond) => {
+    const cert = typeof diamond?.certiFile === 'string' ? diamond.certiFile.trim() : '';
+
+    if (cert) return cert;
+
+    const reportNo = diamond?.reportNo;
+    if (!reportNo) return null;
+
+    const lab = String(diamond.lab || '').toUpperCase();
+    const encoded = encodeURIComponent(reportNo);
+
+    if (lab.includes('IGI')) return `https://www.igi.org/verify-your-report/?r=${encoded}`;
+    if (lab.includes('GIA')) return `https://www.gia.edu/report-check?reportno=${encoded}`;
+    if (lab.includes('GCAL')) return `https://www.gcalusa.com/certificate-search.html?certificate_id=${encoded}`;
+    if (lab.includes('SGL')) return `https://www.sglindia.net/certificate-verification/?reportno=${encoded}`;
+
+    return `https://www.gia.edu/report-check?reportno=${encoded}`;
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const fmt = (val) => (val !== null && val !== undefined && val !== '' ? val : '–');
@@ -103,7 +124,7 @@ const FeaturedAdCard = ({ diamond, onRemove }) => {
                 <button
                     className="featured-ad-remove-btn"
                     title="Remove from featured"
-                    onClick={() => onRemove(diamond.encrypted_id)}
+                    onClick={() => onRemove(diamond.ad_encrypted_id || diamond.encrypted_id)}
                 >
                     <X size={12} />
                 </button>
@@ -201,9 +222,9 @@ const FeaturedAdCard = ({ diamond, onRemove }) => {
 
                 {/* Footer action */}
                 <div className="featured-ad-footer-action">
-                    {diamond.reportNo ? (
+                    {reportUrlFor(diamond) ? (
                         <a
-                            href={`https://www.gia.edu/report-check?reportno=${diamond.reportNo}`}
+                            href={reportUrlFor(diamond)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="featured-ad-view-btn"
@@ -256,7 +277,7 @@ const EmptySlotCard = ({ slotIndex, onOpen }) => (
 );
 
 // Separate sub-component so each row can have its own state (thumbErr)
-const SelectorItem = ({ d, img, alreadySelected, maxReached, onSelect }) => {
+const SelectorItem = ({ d, img, alreadySelected, maxReached, onSelect, selectedAd }) => {
     const [thumbErr, setThumbErr] = useState(false);
     return (
         <div className={`featured-selector-item${alreadySelected ? ' is-selected' : ''}`}>
@@ -309,7 +330,7 @@ const SelectorItem = ({ d, img, alreadySelected, maxReached, onSelect }) => {
                     <button
                         className="featured-selector-pick-btn"
                         style={{ background: '#d93025' }}
-                        onClick={() => onSelect(d, true)}
+                        onClick={() => onSelect(selectedAd || d, true)}
                     >
                         Remove
                     </button>
@@ -337,7 +358,7 @@ const SelectorItem = ({ d, img, alreadySelected, maxReached, onSelect }) => {
 //   searchQuery   – live input value (display only)
 //   onSearch      – handler that debounces + hits server
 const DiamondSelectorModal = ({
-    isOpen, onClose, onSelect, selectedIds,
+    isOpen, onClose, onSelect, selectedAds,
     diamonds, total, loading, loadingMore, onLoadMore,
     searchQuery, onSearch,
 }) => {
@@ -380,7 +401,7 @@ const DiamondSelectorModal = ({
                     <div>
                         <h2 className="featured-selector-header-title">Select Diamond for Feature Ad</h2>
                         <p className="featured-selector-header-subtitle">
-                            Choose up to {MAX_ADS} diamonds · {selectedIds.length}/{MAX_ADS} selected
+                            Choose up to {MAX_ADS} diamonds · {Object.keys(selectedAds).length}/{MAX_ADS} selected
                         </p>
                     </div>
                     <button className="featured-selector-close-btn" onClick={onClose} aria-label="Close">
@@ -441,16 +462,24 @@ const DiamondSelectorModal = ({
                     )}
 
                     {/* Diamond list */}
-                    {!loading && diamonds.map((d) => (
-                        <SelectorItem
-                            key={d.encrypted_id}
-                            d={d}
-                            img={d.imageLink || d.assetImage || null}
-                            alreadySelected={selectedIds.includes(d.encrypted_id)}
-                            maxReached={selectedIds.length >= MAX_ADS}
-                            onSelect={onSelect}
-                        />
-                    ))}
+                    {!loading && diamonds.map((d) => {
+                        // Encrypted IDs are randomised per response, so match on
+                        // the stable stock number instead.
+                        const key = d.stockNo || d.encrypted_id;
+                        const ad = selectedAds[key];
+
+                        return (
+                            <SelectorItem
+                                key={key}
+                                d={d}
+                                img={d.imageLink || d.assetImage || null}
+                                alreadySelected={!!ad}
+                                maxReached={Object.keys(selectedAds).length >= MAX_ADS}
+                                onSelect={onSelect}
+                                selectedAd={ad}
+                            />
+                        );
+                    })}
 
                     {/* Sentinel div — watched by IntersectionObserver */}
                     {!loading && hasMore && (
@@ -509,17 +538,12 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    // Featured ads state — persisted to localStorage
-    const [featuredDiamonds, setFeaturedDiamonds] = useState(() => {
-        try {
-            const stored = localStorage.getItem(LS_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch {
-            return [];
-        }
-    });
+    // Featured ads state — persisted in the database
+    const [featuredDiamonds, setFeaturedDiamonds] = useState([]);
+    const [featuredLoading, setFeaturedLoading] = useState(false);
 
     // ── Selector modal state ──
+    const [targetSlot, setTargetSlot] = useState(null); // clicked empty slot, if any
     const [selectorOpen, setSelectorOpen] = useState(false);
     const [selectorDiamonds, setSelectorDiamonds] = useState([]);
     const [selectorTotal, setSelectorTotal] = useState(0);
@@ -531,10 +555,20 @@ const Dashboard = () => {
     const selectorAbortRef = useRef(null);
     const SELECTOR_PER_PAGE = 25;
 
-    // Persist featured to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem(LS_KEY, JSON.stringify(featuredDiamonds));
-    }, [featuredDiamonds]);
+    // Load featured ads from the database
+    const fetchFeaturedAds = useCallback(async () => {
+        setFeaturedLoading(true);
+        try {
+            const res = await featuredAdsApi.list();
+            const items = Array.isArray(res?.data) ? res.data : [];
+            setFeaturedDiamonds(items.slice(0, MAX_ADS));
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message || 'Failed to load featured ads';
+            showToast(msg, 'error');
+        } finally {
+            setFeaturedLoading(false);
+        }
+    }, [showToast]);
 
     // Fetch dashboard counts
     const fetchCounts = async () => {
@@ -558,7 +592,8 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchCounts();
-    }, []);
+        fetchFeaturedAds();
+    }, [fetchFeaturedAds]);
 
     // ── Core function: fetch one page of diamonds for the selector ──
     const fetchSelectorPage = useCallback(async (page, query, append) => {
@@ -630,7 +665,8 @@ const Dashboard = () => {
     }, [selectorQuery, selectorOpen]);
 
     // ── Open selector: reset state and fetch page 1 ──
-    const openSelector = useCallback(() => {
+    const openSelector = useCallback((slot) => {
+        setTargetSlot(slot || null);
         setSelectorOpen(true);
         setSelectorDiamonds([]);
         setSelectorPage(1);
@@ -648,28 +684,70 @@ const Dashboard = () => {
     }, [selectorDiamonds.length, selectorTotal, selectorLoadingMore, selectorLoading, selectorPage, selectorQuery, fetchSelectorPage]);
 
     // Handle add / remove inside modal
-    const handleSelectorPick = (diamond, isRemove) => {
+    const handleSelectorPick = async (diamond, isRemove) => {
+        const stockKey = diamond.stockNo || diamond.encrypted_id;
+
         if (isRemove) {
-            setFeaturedDiamonds((prev) => prev.filter((d) => d.encrypted_id !== diamond.encrypted_id));
+            try {
+                await featuredAdsApi.remove(diamond.ad_encrypted_id || diamond.encrypted_id);
+                setFeaturedDiamonds((prev) => prev.filter((d) => (d.stockNo || d.encrypted_id) !== stockKey));
+                showToast('Diamond removed from featured ads', 'info');
+            } catch (err) {
+                showToast(err.response?.data?.message || 'Failed to remove featured ad', 'error');
+            }
             return;
         }
         if (featuredDiamonds.length >= MAX_ADS) {
             showToast(`Maximum ${MAX_ADS} featured diamonds allowed`, 'warning');
             return;
         }
-        if (featuredDiamonds.find((d) => d.encrypted_id === diamond.encrypted_id)) return;
-        setFeaturedDiamonds((prev) => [...prev, diamond]);
-        showToast(`"${diamond.stockNo}" added to featured ads`, 'success');
+        // Encrypted IDs change on every response; stock number is the stable key.
+        if (featuredDiamonds.some((d) => (d.stockNo || d.encrypted_id) === stockKey)) {
+            showToast('This diamond is already featured.', 'warning');
+            return;
+        }
+
+        try {
+            const res = await featuredAdsApi.add(diamond.encrypted_id, targetSlot);
+            const added = res?.data && !Array.isArray(res.data) ? res.data : diamond;
+            setTargetSlot(null);
+            setFeaturedDiamonds((prev) => (
+                prev.some((d) => (d.stockNo || d.encrypted_id) === (added.stockNo || added.encrypted_id))
+                    ? prev
+                    : [...prev, added]
+            ));
+            showToast(`"${diamond.stockNo}" added to featured ads`, 'success');
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Failed to add featured ad', 'error');
+        }
     };
 
     // Remove directly from ad card × button
-    const handleRemoveAd = (encryptedId) => {
-        setFeaturedDiamonds((prev) => prev.filter((d) => d.encrypted_id !== encryptedId));
-        showToast('Diamond removed from featured ads', 'info');
+    const handleRemoveAd = async (adEncryptedId) => {
+        try {
+            await featuredAdsApi.remove(adEncryptedId);
+            setFeaturedDiamonds((prev) => prev.filter((d) => d.ad_encrypted_id !== adEncryptedId));
+            showToast('Diamond removed from featured ads', 'info');
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Failed to remove featured ad', 'error');
+        }
     };
 
-    // Build strict 3-slot array: filled slots + empty placeholders
-    const slots = Array.from({ length: MAX_ADS }, (_, i) => featuredDiamonds[i] || null);
+    // Build strict 3-slot array from each ad's fixed position. Empty slots stay
+    // empty when an ad is removed — later slots never shift forward.
+    const slots = Array.from(
+        { length: MAX_ADS },
+        (_, i) => featuredDiamonds.find((d) => Number(d.position) === i + 1) || null
+    );
+
+    // Safety net for any record saved without a valid slot number.
+    featuredDiamonds.forEach((d) => {
+        const pos = Number(d.position);
+        if (!Number.isInteger(pos) || pos < 1 || pos > MAX_ADS || !slots.includes(d)) {
+            const free = slots.indexOf(null);
+            if (free !== -1) slots[free] = d;
+        }
+    });
 
     // Master counts card entries
     const cardEntries = Object.entries(labelMap).map(([key, label]) => ({
@@ -679,7 +757,12 @@ const Dashboard = () => {
         Icon: iconMap[key] || Package,
     }));
 
-    const selectedIds = featuredDiamonds.map((d) => d.encrypted_id);
+    // Keyed by stable stock number, holding the full featured-ad record so the
+    // Remove action can use its encrypted ad ID.
+    const selectedAds = featuredDiamonds.reduce((map, d) => {
+        map[d.stockNo || d.encrypted_id] = d;
+        return map;
+    }, {});
 
     return (
         <Layout>
@@ -722,11 +805,15 @@ const Dashboard = () => {
                         </span>
                         <button
                             className="featured-add-btn"
-                            disabled={featuredDiamonds.length >= MAX_ADS}
-                            onClick={openSelector}
+                            disabled={featuredLoading || featuredDiamonds.length >= MAX_ADS}
+                            onClick={() => openSelector()}
                         >
                             <Plus size={15} />
-                            {featuredDiamonds.length >= MAX_ADS ? 'All Slots Filled' : 'Add Diamond'}
+                            {featuredLoading
+                                ? 'Loading...'
+                                : featuredDiamonds.length >= MAX_ADS
+                                    ? 'All Slots Filled'
+                                    : 'Add Diamond'}
                         </button>
                     </div>
                 </div>
@@ -744,7 +831,7 @@ const Dashboard = () => {
                             <EmptySlotCard
                                 key={`empty-${idx}`}
                                 slotIndex={idx + 1}
-                                onOpen={openSelector}
+                                onOpen={() => openSelector(idx + 1)}
                             />
                         )
                     )}
@@ -827,7 +914,7 @@ const Dashboard = () => {
                 isOpen={selectorOpen}
                 onClose={() => { setSelectorOpen(false); }}
                 onSelect={handleSelectorPick}
-                selectedIds={selectedIds}
+                selectedAds={selectedAds}
                 diamonds={selectorDiamonds}
                 total={selectorTotal}
                 loading={selectorLoading}

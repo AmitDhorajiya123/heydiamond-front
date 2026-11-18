@@ -17,7 +17,7 @@ import CustomerSearchSelect from '../components/CustomerSearchSelect';
 import customerMarkupApi from '../apis/customerMarkup';
 import { useToast } from '../context/ToastContext';
 
-const emptyRange = { min_value: '', max_value: '', markup: '' };
+const emptyRange = { min_value: '', max_value: '', white_markup: '', color_markup: '' };
 
 const createEmptyForm = () => ({
     markup: '',
@@ -27,11 +27,17 @@ const createEmptyForm = () => ({
 const customerToForm = (customer) => ({
     markup: customer.markup !== undefined && customer.markup !== null ? String(customer.markup) : '',
     markups: Array.isArray(customer.markups)
-        ? customer.markups.map((range) => ({
-            min_value: range.min_value !== undefined && range.min_value !== null ? String(range.min_value) : '',
-            max_value: range.max_value !== undefined && range.max_value !== null ? String(range.max_value) : '',
-            markup: range.markup !== undefined && range.markup !== null ? String(range.markup) : '',
-        }))
+        ? customer.markups.map((range) => {
+            // Older payloads used a single `markup`; use it for both columns.
+            const legacy = range.markup !== undefined && range.markup !== null ? String(range.markup) : '';
+
+            return {
+                min_value: range.min_value !== undefined && range.min_value !== null ? String(range.min_value) : '',
+                max_value: range.max_value !== undefined && range.max_value !== null ? String(range.max_value) : '',
+                white_markup: range.white_markup !== undefined && range.white_markup !== null ? String(range.white_markup) : legacy,
+                color_markup: range.color_markup !== undefined && range.color_markup !== null ? String(range.color_markup) : legacy,
+            };
+        })
         : [],
 });
 
@@ -82,7 +88,7 @@ const sanitizePercentageInput = (value) => {
 };
 
 const hasRangeValue = (range) => (
-    [range.min_value, range.max_value, range.markup]
+    [range.min_value, range.max_value, range.white_markup, range.color_markup]
         .some((value) => value !== '' && value !== null && value !== undefined)
 );
 
@@ -93,7 +99,6 @@ const rangeMarkupError = (range, index) => {
 
     const min = parseOptionalNumber(range.min_value);
     const max = parseOptionalNumber(range.max_value);
-    const markup = parseOptionalNumber(range.markup);
 
     // Blank fields are optional and fall back to sensible defaults.
     if (min !== null && (Number.isNaN(min) || min < 0)) {
@@ -102,11 +107,16 @@ const rangeMarkupError = (range, index) => {
     if (max !== null && (Number.isNaN(max) || max < min || (min === null && max < 0))) {
         return `Range ${index + 1}: "To" must be greater than or equal to "From".`;
     }
-    if (markup !== null && (Number.isNaN(markup) || markup < 0)) {
-        return `Range ${index + 1}: enter a valid markup %.`;
-    }
-    if (markup !== null && markup > MAX_MARKUP_PERCENT) {
-        return `Range ${index + 1}: markup cannot exceed ${MAX_MARKUP_PERCENT}%.`;
+
+    for (const [key, label] of [['white_markup', 'White'], ['color_markup', 'Color']]) {
+        const value = parseOptionalNumber(range[key]);
+
+        if (value !== null && (Number.isNaN(value) || value < 0)) {
+            return `Range ${index + 1}: enter a valid ${label} markup %.`;
+        }
+        if (value !== null && value > MAX_MARKUP_PERCENT) {
+            return `Range ${index + 1}: ${label} markup cannot exceed ${MAX_MARKUP_PERCENT}%.`;
+        }
     }
 
     return null;
@@ -301,10 +311,10 @@ const MarkupPage = () => {
         setForm((prev) => ({
             ...prev,
             markups: [
-                { min_value: '0', max_value: '100', markup: '' },
-                { min_value: '101', max_value: '200', markup: '' },
-                { min_value: '201', max_value: '300', markup: '' },
-                { min_value: '301', max_value: '', markup: '' },
+                { ...emptyRange, min_value: '0', max_value: '0.49' },
+                { ...emptyRange, min_value: '0.50', max_value: '0.99' },
+                { ...emptyRange, min_value: '1.00', max_value: '1.49' },
+                { ...emptyRange, min_value: '1.50', max_value: '' },
             ],
         }));
     };
@@ -346,12 +356,14 @@ const MarkupPage = () => {
                     }
 
                     const min = parseOptionalNumber(range.min_value);
-                    const markup = parseOptionalNumber(range.markup);
+                    const whiteMarkup = parseOptionalNumber(range.white_markup);
+                    const colorMarkup = parseOptionalNumber(range.color_markup);
 
                     return {
                         min: min === null ? 0 : min,
                         max: parseOptionalNumber(range.max_value),
-                        markup: markup === null ? 0 : markup,
+                        whiteMarkup: whiteMarkup === null ? 0 : whiteMarkup,
+                        colorMarkup: colorMarkup === null ? 0 : colorMarkup,
                     };
                 })
                 .filter(Boolean);
@@ -382,7 +394,8 @@ const MarkupPage = () => {
                 markups: sortedRanges.map((range) => ({
                     min_value: range.min,
                     max_value: range.max,
-                    markup: range.markup,
+                    white_markup: range.whiteMarkup,
+                    color_markup: range.colorMarkup,
                 })),
             });
 
@@ -478,7 +491,7 @@ const MarkupPage = () => {
                                         Default Markup {renderSortIcon('markup')}
                                     </button>
                                 </th>
-                                <th>Markup Ranges ($/ct)</th>
+                                <th>Markup Ranges (Carat Weight)</th>
                                 <th style={{ width: '120px' }}>Actions</th>
                             </tr>
                         </thead>
@@ -503,7 +516,11 @@ const MarkupPage = () => {
                                                 {customer.markups.slice(0, 4).map((range, index) => (
                                                     <div className="markup-range-summary-row" key={index}>
                                                         <span>{formatRange(range)}</span>
-                                                        <strong>{Number(range.markup || 0).toFixed(2)}%</strong>
+                                                        <strong>
+                                                            W {Number(range.white_markup ?? 0).toFixed(2)}%
+                                                            {' · '}
+                                                            C {Number(range.color_markup ?? 0).toFixed(2)}%
+                                                        </strong>
                                                     </div>
                                                 ))}
                                                 {customer.markups.length > 4 && (
@@ -609,7 +626,7 @@ const MarkupPage = () => {
                                                 disabled={saving || customerLoading}
                                             />
                                             <p className="form-help">
-                                                Used when a diamond&apos;s $/ct does not match any range below. Maximum {MAX_MARKUP_PERCENT}%.
+                                                Fallback for both white and fancy-color diamonds when no range matches. Maximum {MAX_MARKUP_PERCENT}%.
                                             </p>
                                         </div>
 
@@ -617,10 +634,10 @@ const MarkupPage = () => {
                                             <div className="markup-ranges-header">
                                                 <div>
                                                     <label className="form-label" style={{ marginBottom: 0 }}>
-                                                        Markup Ranges ($/ct)
+                                                        Markup Ranges (Carat Weight)
                                                     </label>
                                                     <p className="form-help" style={{ margin: '4px 0 0' }}>
-                                                        The matched range&apos;s % is added to both $/ct and Total $ for this customer.
+                                                        Ranges are matched on carat weight. White % applies to D-Z stones; Color % applies to fancy-color stones. Both are added to $/ct and Total $.
                                                     </p>
                                                 </div>
                                                 <div className="markup-ranges-actions">
@@ -647,9 +664,10 @@ const MarkupPage = () => {
                                             {form.markups.length > 0 ? (
                                                 <div className="markup-ranges-table">
                                                     <div className="markup-range-labels">
-                                                        <span>From ($/ct)</span>
-                                                        <span>To ($/ct)</span>
-                                                        <span>Markup (%)</span>
+                                                        <span>From (ct)</span>
+                                                        <span>To (ct)</span>
+                                                        <span>White %</span>
+                                                        <span>Color %</span>
                                                         <span />
                                                     </div>
                                                     {form.markups.map((range, index) => {
@@ -680,8 +698,17 @@ const MarkupPage = () => {
                                                                         className="form-input"
                                                                         type="text"
                                                                         inputMode="decimal"
-                                                                        value={range.markup}
-                                                                        onChange={(e) => updateRange(index, 'markup', sanitizePercentageInput(e.target.value))}
+                                                                        value={range.white_markup}
+                                                                        onChange={(e) => updateRange(index, 'white_markup', sanitizePercentageInput(e.target.value))}
+                                                                        placeholder="0.00"
+                                                                        disabled={saving || customerLoading}
+                                                                    />
+                                                                    <input
+                                                                        className="form-input"
+                                                                        type="text"
+                                                                        inputMode="decimal"
+                                                                        value={range.color_markup}
+                                                                        onChange={(e) => updateRange(index, 'color_markup', sanitizePercentageInput(e.target.value))}
                                                                         placeholder="0.00"
                                                                         disabled={saving || customerLoading}
                                                                     />
@@ -704,7 +731,7 @@ const MarkupPage = () => {
                                                 </div>
                                             ) : (
                                                 <p className="markup-ranges-empty">
-                                                    No ranges configured. The default markup is used for every diamond.
+                                                    No ranges configured. The default markup is used for every white and fancy-color diamond.
                                                 </p>
                                             )}
                                         </div>
